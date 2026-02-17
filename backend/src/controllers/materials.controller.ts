@@ -26,6 +26,12 @@ export const listMaterials = async (
       where.OR = [
         { productName: { contains: filters.search, mode: "insensitive" } },
         { caseNo: { contains: filters.search, mode: "insensitive" } },
+        { email: { contains: filters.search, mode: "insensitive" } },
+        { mobile: { contains: filters.search, mode: "insensitive" } },
+        { companyName: { contains: filters.search, mode: "insensitive" } },
+        { location: { contains: filters.search, mode: "insensitive" } },
+        { price: { contains: filters.search, mode: "insensitive" } },
+        { remarks: { contains: filters.search, mode: "insensitive" } },
       ];
     }
 

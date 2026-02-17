@@ -63,13 +63,13 @@ function FilterBar({ filters, onFilterChange }: FilterBarProps) {
         {/* Search */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            Search Product / Case No
+            Search (All Fields)
           </label>
           <input
             type="text"
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
-            placeholder="Search..."
+            placeholder="Search by product, phone, email, company..."
             className="input"
           />
         </div>

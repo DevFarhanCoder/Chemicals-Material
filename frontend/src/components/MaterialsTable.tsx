@@ -64,8 +64,18 @@ function MaterialsTable({
   const columns = useMemo<ColumnDef<Material>[]>(
     () => [
       {
+        id: "srNo",
+        header: "Sr. No.",
+        size: 80,
+        cell: ({ row }) => (
+          <div className="text-sm font-medium">
+            {(pagination.page - 1) * pagination.limit + row.index + 1}
+          </div>
+        ),
+      },
+      {
         accessorKey: "caseNo",
-        header: "Case No",
+        header: "CAS No.",
         size: 120,
         cell: ({ row }) => (
           <div className="font-mono text-xs">{row.original.caseNo}</div>
@@ -74,66 +84,12 @@ function MaterialsTable({
       {
         accessorKey: "productName",
         header: "Product Name",
-        size: 300,
+        size: 250,
         cell: ({ row }) => (
           <div className="max-w-xs">
             <div className="font-medium text-gray-900 line-clamp-2">
               {row.original.productName}
             </div>
-            <div className="text-xs text-gray-500 mt-1">
-              {row.original.sourceSite}
-            </div>
-          </div>
-        ),
-      },
-      {
-        accessorKey: "companyName",
-        header: "Company",
-        size: 150,
-        cell: ({ row }) => (
-          <div className="font-medium">{row.original.companyName}</div>
-        ),
-      },
-      {
-        accessorKey: "email",
-        header: "Email",
-        size: 200,
-        cell: ({ row }) => (
-          <div className="text-sm">
-            {row.original.email ? (
-              <a
-                href={`mailto:${row.original.email}`}
-                className="text-primary-600 hover:underline"
-              >
-                {row.original.email}
-              </a>
-            ) : (
-              <span className="text-gray-400">-</span>
-            )}
-          </div>
-        ),
-      },
-      {
-        accessorKey: "mobile",
-        header: "Mobile",
-        size: 130,
-        cell: ({ row }) => (
-          <div className="text-sm font-mono whitespace-nowrap">
-            {row.original.mobile ? (
-              <span>{String(row.original.mobile)}</span>
-            ) : (
-              <span className="text-gray-400">-</span>
-            )}
-          </div>
-        ),
-      },
-      {
-        accessorKey: "location",
-        header: "Location",
-        size: 150,
-        cell: ({ row }) => (
-          <div className="text-sm">
-            {row.original.location || <span className="text-gray-400">-</span>}
           </div>
         ),
       },
@@ -148,51 +104,77 @@ function MaterialsTable({
         ),
       },
       {
-        accessorKey: "status",
-        header: "Status",
-        size: 150,
-        cell: ({ row }) => {
-          const isEditing =
-            editingCell?.rowId === row.original.id &&
-            editingCell?.field === "status";
-
-          if (isEditing) {
-            return (
-              <select
-                autoFocus
-                value={row.original.status}
-                onChange={(e) => {
-                  onUpdate(row.original.id, {
-                    status: e.target.value as MaterialStatus,
-                  });
-                  setEditingCell(null);
-                }}
-                onBlur={() => setEditingCell(null)}
-                className="text-sm border rounded px-2 py-1"
+        id: "unit",
+        header: "Unit",
+        size: 80,
+        cell: () => (
+          <div className="text-sm text-gray-500">-</div>
+        ),
+      },
+      {
+        accessorKey: "email",
+        header: "Email ID",
+        size: 200,
+        cell: ({ row }) => (
+          <div className="text-sm">
+            {row.original.email ? (
+              <a
+                href={`mailto:${row.original.email}`}
+                className="text-blue-600 hover:underline"
               >
-                <option value="PENDING">Pending</option>
-                <option value="CONTACTED">Contacted</option>
-                <option value="NOT_INTERESTED">Not Interested</option>
-                <option value="CONVERTED">Converted</option>
-              </select>
-            );
-          }
-
-          return (
-            <div
-              onClick={() =>
-                setEditingCell({ rowId: row.original.id, field: "status" })
-              }
-              className="cursor-pointer"
-            >
-              {getStatusBadge(row.original.status)}
-            </div>
-          );
-        },
+                {row.original.email}
+              </a>
+            ) : (
+              <span className="text-gray-400">-</span>
+            )}
+          </div>
+        ),
+      },
+      {
+        accessorKey: "mobile",
+        header: "Contact No.",
+        size: 130,
+        cell: ({ row }) => (
+          <div className="text-sm font-mono whitespace-nowrap">
+            {row.original.mobile ? (
+              <span>{String(row.original.mobile)}</span>
+            ) : (
+              <span className="text-gray-400">-</span>
+            )}
+          </div>
+        ),
+      },
+      {
+        accessorKey: "companyName",
+        header: "Company Name",
+        size: 150,
+        cell: ({ row }) => (
+          <div className="font-medium">{row.original.companyName}</div>
+        ),
+      },
+      {
+        accessorKey: "location",
+        header: "State Location",
+        size: 150,
+        cell: ({ row }) => (
+          <div className="text-sm">
+            {row.original.location || <span className="text-gray-400">-</span>}
+          </div>
+        ),
+      },
+      {
+        accessorKey: "createdAt",
+        header: "Date",
+        size: 120,
+        cell: ({ row }) => (
+          <div className="text-sm">
+            {format(new Date(row.original.createdAt), "MMM dd, yyyy")}
+          </div>
+        ),
       },
       {
         accessorKey: "remarks",
-        header: "Remarks",
+        header: "Remark",
         size: 200,
         cell: ({ row }) => {
           const isEditing =
@@ -234,34 +216,22 @@ function MaterialsTable({
         },
       },
       {
-        accessorKey: "lastContacted",
-        header: "Last Contact",
+        id: "actions",
+        header: "Add/ Delete",
         size: 120,
         cell: ({ row }) => (
-          <div className="text-sm">
-            {row.original.lastContacted ? (
-              format(new Date(row.original.lastContacted), "MMM dd, yyyy")
-            ) : (
-              <span className="text-gray-400">-</span>
-            )}
+          <div className="flex gap-2">
+            <button
+              onClick={() => onDelete(row.original.id)}
+              className="text-red-600 hover:text-red-700 text-sm font-medium"
+            >
+              Delete
+            </button>
           </div>
         ),
       },
-      {
-        id: "actions",
-        header: "Actions",
-        size: 80,
-        cell: ({ row }) => (
-          <button
-            onClick={() => onDelete(row.original.id)}
-            className="text-red-600 hover:text-red-700 text-sm font-medium"
-          >
-            Delete
-          </button>
-        ),
-      },
     ],
-    [editingCell, onUpdate, onDelete],
+    [editingCell, onUpdate, onDelete, pagination],
   );
 
   const table = useReactTable({
@@ -305,7 +275,7 @@ function MaterialsTable({
                 {headerGroup.headers.map((header) => (
                   <th
                     key={header.id}
-                    className="table-header"
+                    className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
                     style={{ width: header.getSize() }}
                     onClick={header.column.getToggleSortingHandler()}
                   >
