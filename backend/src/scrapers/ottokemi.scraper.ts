@@ -104,10 +104,12 @@ export class OttoKemiScraper extends BaseScraper {
       // Try to get contact info from footer or contact section
       const contactData = await this.page.evaluate(() => {
         // @ts-expect-error - document is available in Puppeteer browser context
-        const contactSection =
-          document.querySelector(".contact, #contact, footer, .footer") ||
-          document.body;
-        const text = contactSection.textContent || "";
+        const contactSection = document.querySelector(
+          ".contact, #contact, footer, .footer",
+        );
+        // @ts-expect-error - document is available in Puppeteer browser context
+        const fallback = document.body;
+        const text = (contactSection || fallback).textContent || "";
 
         // Look for location
         let location = "India";

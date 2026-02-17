@@ -123,9 +123,12 @@ export class CombiBlocksScraper extends BaseScraper {
       const contactData = await this.page.evaluate(() => {
         // Look for contact section, footer, or specific contact elements
         // @ts-expect-error - document is available in Puppeteer browser context
-        const contactSection =
-          document.querySelector(".contact, #contact, footer") || document.body;
-        const text = contactSection.textContent || "";
+        const contactSection = document.querySelector(
+          ".contact, #contact, footer",
+        );
+        // @ts-expect-error - document is available in Puppeteer browser context
+        const fallback = document.body;
+        const text = (contactSection || fallback).textContent || "";
 
         // Extract location from text
         let location = "USA";
