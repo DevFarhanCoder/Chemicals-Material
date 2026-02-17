@@ -36,7 +36,7 @@ const allowedOrigins = [
   process.env.CORS_ORIGIN,
   "http://localhost:3000",
   "https://chemicals-material.vercel.app",
-].filter(Boolean);
+].filter((origin): origin is string => Boolean(origin));
 
 app.use(
   cors({
