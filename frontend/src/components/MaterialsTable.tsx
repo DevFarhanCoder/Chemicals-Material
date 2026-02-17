@@ -107,9 +107,7 @@ function MaterialsTable({
         id: "unit",
         header: "Unit",
         size: 80,
-        cell: () => (
-          <div className="text-sm text-gray-500">-</div>
-        ),
+        cell: () => <div className="text-sm text-gray-500">-</div>,
       },
       {
         accessorKey: "email",

@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
-import { MaterialFilters, MaterialStatus } from '../types';
-import { api } from '../services/api';
+import { useState, useEffect } from "react";
+import { MaterialFilters, MaterialStatus } from "../types";
+import { api } from "../services/api";
 
 interface FilterBarProps {
   filters: MaterialFilters;
@@ -10,13 +10,13 @@ interface FilterBarProps {
 function FilterBar({ filters, onFilterChange }: FilterBarProps) {
   const [companies, setCompanies] = useState<string[]>([]);
   const [locations, setLocations] = useState<string[]>([]);
-  const [searchInput, setSearchInput] = useState(filters.search || '');
+  const [searchInput, setSearchInput] = useState(filters.search || "");
 
   useEffect(() => {
     // Fetch distinct values for dropdowns
     Promise.all([
-      api.getDistinctValues('companyName'),
-      api.getDistinctValues('location'),
+      api.getDistinctValues("companyName"),
+      api.getDistinctValues("location"),
     ]).then(([companiesData, locationsData]) => {
       setCompanies(companiesData.map((item) => item.value));
       setLocations(locationsData.map((item) => item.value));
@@ -33,7 +33,7 @@ function FilterBar({ filters, onFilterChange }: FilterBarProps) {
   }, [searchInput]);
 
   const handleClearFilters = () => {
-    setSearchInput('');
+    setSearchInput("");
     onFilterChange({
       search: undefined,
       company: undefined,
@@ -80,7 +80,7 @@ function FilterBar({ filters, onFilterChange }: FilterBarProps) {
             Company
           </label>
           <select
-            value={filters.company || ''}
+            value={filters.company || ""}
             onChange={(e) =>
               onFilterChange({ company: e.target.value || undefined })
             }
@@ -101,7 +101,7 @@ function FilterBar({ filters, onFilterChange }: FilterBarProps) {
             Location
           </label>
           <select
-            value={filters.location || ''}
+            value={filters.location || ""}
             onChange={(e) =>
               onFilterChange({ location: e.target.value || undefined })
             }
@@ -122,7 +122,7 @@ function FilterBar({ filters, onFilterChange }: FilterBarProps) {
             Status
           </label>
           <select
-            value={filters.status || ''}
+            value={filters.status || ""}
             onChange={(e) =>
               onFilterChange({
                 status: (e.target.value as MaterialStatus) || undefined,
