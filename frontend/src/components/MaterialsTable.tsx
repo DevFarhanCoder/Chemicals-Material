@@ -7,7 +7,7 @@ import {
   SortingState,
   ColumnDef,
 } from "@tanstack/react-table";
-import { Material, MaterialStatus, PaginationInfo } from "../types";
+import { Material, PaginationInfo } from "../types";
 import { format } from "date-fns";
 
 interface MaterialsTableProps {
@@ -32,33 +32,8 @@ function MaterialsTable({
   const [sorting, setSorting] = useState<SortingState>([]);
   const [editingCell, setEditingCell] = useState<{
     rowId: string;
-    field: "status" | "remarks";
+    field: "remarks";
   } | null>(null);
-
-  // Status badge styling
-  const getStatusBadge = (status: MaterialStatus) => {
-    const styles = {
-      PENDING: "bg-yellow-100 text-yellow-800",
-      CONTACTED: "bg-blue-100 text-blue-800",
-      NOT_INTERESTED: "bg-red-100 text-red-800",
-      CONVERTED: "bg-green-100 text-green-800",
-    };
-
-    const labels = {
-      PENDING: "Pending",
-      CONTACTED: "Contacted",
-      NOT_INTERESTED: "Not Interested",
-      CONVERTED: "Converted",
-    };
-
-    return (
-      <span
-        className={`px-2 py-1 rounded-full text-xs font-medium ${styles[status]}`}
-      >
-        {labels[status]}
-      </span>
-    );
-  };
 
   // Define columns
   const columns = useMemo<ColumnDef<Material>[]>(
