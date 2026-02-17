@@ -1,0 +1,22 @@
+{
+  "version": 2,
+  "name": "chemicals-backend",
+  "builds": [
+    {
+      "src": "src/server.ts",
+      "use": "@vercel/node"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "src/server.ts"
+    }
+  ],
+  "env": {
+    "NODE_ENV": "production",
+    "DATABASE_URL": "@database_url",
+    "PORT": "5000",
+    "CORS_ORIGIN": "@cors_origin"
+  }
+}

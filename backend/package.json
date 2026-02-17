@@ -1,0 +1,59 @@
+{
+  "name": "chemical-materials-backend",
+  "version": "1.0.0",
+  "description": "Backend API for Chemical Materials Aggregation Dashboard",
+  "main": "dist/server.js",
+  "scripts": {
+    "dev": "nodemon --exec ts-node src/server.ts",
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev",
+    "prisma:studio": "prisma studio",
+    "scrape": "ts-node src/scrapers/run-all.ts",
+    "scrape:combi": "ts-node src/scrapers/run-scraper.ts combi-blocks",
+    "scrape:chemsworth": "ts-node src/scrapers/run-scraper.ts chemsworth",
+    "scrape:ottokemi": "ts-node src/scrapers/run-scraper.ts ottokemi",
+    "scrape:chemscene": "ts-node src/scrapers/run-scraper.ts chemscene",
+    "scrape:sigma": "ts-node src/scrapers/run-scraper.ts sigmaaldrich",
+    "lint": "eslint src --ext .ts",
+    "lint:fix": "eslint src --ext .ts --fix"
+  },
+  "keywords": [
+    "express",
+    "typescript",
+    "scraping",
+    "materials",
+    "api"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@prisma/client": "^5.8.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "express-rate-limit": "^7.1.5",
+    "helmet": "^7.1.0",
+    "puppeteer": "^21.7.0",
+    "winston": "^3.11.0",
+    "zod": "^3.22.4"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.17",
+    "@types/dotenv": "^6.1.1",
+    "@types/express": "^4.17.21",
+    "@types/node": "^20.10.6",
+    "@typescript-eslint/eslint-plugin": "^6.17.0",
+    "@typescript-eslint/parser": "^6.17.0",
+    "eslint": "^8.56.0",
+    "nodemon": "^3.0.2",
+    "prisma": "^5.8.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.3.3"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  }
+}

@@ -1,0 +1,85 @@
+// Prisma Schema for Chemical Materials Dashboard
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Main materials table - stores scraped product data
+model Material {
+  id            String    @id @default(uuid())
+  caseNo        String    @unique @map("case_no") @db.VarChar(50)
+  productName   String    @map("product_name") @db.Text
+  email         String?   @db.VarChar(255)
+  mobile        String?   @db.VarChar(50)
+  companyName   String    @map("company_name") @db.VarChar(255)
+  location      String?   @db.VarChar(255)
+  price         String?   @db.VarChar(100)
+  status        Status    @default(PENDING)
+  remarks       String?   @db.Text
+  lastContacted DateTime? @map("last_contacted")
+  
+  // Metadata
+  sourceUrl     String    @map("source_url") @db.Text
+  sourceSite    String    @map("source_site") @db.VarChar(100)
+  scrapedAt     DateTime  @map("scraped_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  // Indexes for fast querying
+  @@index([companyName])
+  @@index([status])
+  @@index([createdAt])
+  @@index([sourceSite])
+  @@map("materials")
+}
+
+// Status enum - tracks admin follow-up stage
+enum Status {
+  PENDING
+  CONTACTED
+  NOT_INTERESTED
+  CONVERTED
+}
+
+// Scraping logs - track scraping jobs
+model ScrapingLog {
+  id           String   @id @default(uuid())
+  source       String   @db.VarChar(100)
+  status       ScrapingStatus
+  itemsScraped Int      @default(0) @map("items_scraped")
+  itemsFailed  Int      @default(0) @map("items_failed")
+  errors       Json?    // Store error details as JSON
+  startedAt    DateTime @map("started_at")
+  completedAt  DateTime? @map("completed_at")
+  duration     Int?     @map("duration_ms") // Duration in milliseconds
+  
+  @@index([source])
+  @@index([startedAt])
+  @@map("scraping_logs")
+}
+
+enum ScrapingStatus {
+  RUNNING
+  SUCCESS
+  FAILED
+  PARTIAL // Some items succeeded, some failed
+}
+
+// Admin actions log - audit trail
+model AdminAction {
+  id         String   @id @default(uuid())
+  materialId String   @map("material_id")
+  action     String   @db.VarChar(50) // status_change, remark_added, etc.
+  oldValue   String?  @map("old_value") @db.Text
+  newValue   String?  @map("new_value") @db.Text
+  timestamp  DateTime @default(now())
+  
+  @@index([materialId])
+  @@index([timestamp])
+  @@map("admin_actions")
+}
