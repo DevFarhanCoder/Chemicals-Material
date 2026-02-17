@@ -2,6 +2,7 @@ import puppeteer, { Browser, Page } from "puppeteer";
 import logger from "../../config/logger";
 
 export interface ScrapedMaterial {
+  caseNo?: string;
   productName: string;
   email?: string;
   mobile?: string;
@@ -130,17 +131,47 @@ export abstract class BaseScraper {
    * Extract phone number from text
    */
   protected extractPhone(text: string): string | undefined {
-    // Match various phone formats (at least 10 consecutive digits, may include formatting)
+    // Match various phone formats with proper validation
+    // Must have at least 10 digits and common phone formatting
     const phoneRegex =
-      /(?:\+?1[-.\s]?)?(?:\(?\d{3}\)?[-.\s]?)?\d{3}[-.\s]?\d{4}/g;
-    const match = text.match(phoneRegex);
+      /(?:(?:\+?1[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4})|(?:\+\d{1,3}[-.\s]?\(?\d{1,4}\)?[-.\s]?\d{1,4}[-.\s]?\d{1,9})/g;
+    const matches = text.match(phoneRegex);
 
-    if (match && match[0]) {
-      // Clean up phone number: remove extra spaces and formatting
-      return match[0].replace(/\s+/g, " ").trim();
+    if (matches) {
+      // Filter out matches that are likely not phone numbers
+      const validPhones = matches.filter((phone) => {
+        // Remove all non-digit characters to count digits
+        const digitsOnly = phone.replace(/\D/g, "");
+        // Valid phone should have 10-15 digits
+        return digitsOnly.length >= 10 && digitsOnly.length <= 15;
+      });
+
+      if (validPhones.length > 0) {
+        // Return the first valid phone number, cleaned up
+        return validPhones[0].replace(/\s+/g, " ").trim();
+      }
     }
 
     return undefined;
+  }
+
+  /**
+   * Extract CAS number from text
+   */
+  protected extractCASNumber(text: string): string | undefined {
+    // CAS numbers are in format XXX-XX-X or XXXX-XX-X or XXXXX-XX-X
+    const casRegex = /\b\d{2,7}-\d{2}-\d\b/g;
+    const match = text.match(casRegex);
+    return match ? match[0] : undefined;
+  }
+
+  /**
+   * Generate a unique case number for tracking
+   */
+  protected generateCaseNumber(): string {
+    const timestamp = Date.now();
+    const random = Math.floor(Math.random() * 1000);
+    return `${this.sourceName.toUpperCase()}-${timestamp}-${random}`;
   }
 
   /**

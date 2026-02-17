@@ -31,7 +31,12 @@ export class OttoKemiScraper extends BaseScraper {
 
       // Extract product listings from the page
       const products = await this.page.evaluate(() => {
-        const items: Array<{ name: string; price: string; url: string }> = [];
+        const items: Array<{
+          name: string;
+          cas: string;
+          price: string;
+          url: string;
+        }> = [];
 
         // Look for product listings
         // @ts-expect-error - document is available in Puppeteer browser context
@@ -41,11 +46,13 @@ export class OttoKemiScraper extends BaseScraper {
 
         productElements.forEach((el: any) => {
           const nameEl = el.querySelector("td, .name, h3, .title");
+          const casEl = el.querySelector(".cas, .cas-number");
           const priceEl = el.querySelector(".price, .cost");
 
           if (nameEl && nameEl.textContent) {
             items.push({
               name: nameEl.textContent.trim(),
+              cas: casEl?.textContent?.trim() || "",
               price: priceEl?.textContent?.trim() || "",
               // @ts-expect-error - window is available in Puppeteer browser context
               url: window.location.href,
@@ -59,7 +66,12 @@ export class OttoKemiScraper extends BaseScraper {
       logger.info(`Found ${products.length} products on OttoKemi`);
 
       for (const product of products.slice(0, 50)) {
+        const casNumber =
+          this.extractCASNumber(product.cas + " " + product.name) ||
+          this.generateCaseNumber();
+
         materials.push({
+          caseNo: casNumber,
           productName: this.cleanText(product.name),
           price: product.price || undefined,
           companyName: contactInfo.companyName,
@@ -89,14 +101,31 @@ export class OttoKemiScraper extends BaseScraper {
     if (!this.page) throw new Error("Page not initialized");
 
     try {
-      // @ts-expect-error - document is available in Puppeteer browser context
-      const pageText = await this.page.evaluate(() => document.body.innerText);
+      // Try to get contact info from footer or contact section
+      const contactData = await this.page.evaluate(() => {
+        const contactSection =
+          document.querySelector(".contact, #contact, footer, .footer") ||
+          document.body;
+        const text = contactSection.textContent || "";
+
+        // Look for location
+        let location = "India";
+        const locationMatch = text.match(/(Mumbai|India|Maharashtra)/i);
+        if (locationMatch) {
+          location = locationMatch[0];
+        }
+
+        return {
+          pageText: text,
+          location,
+        };
+      });
 
       return {
         companyName: "OttoKemi",
-        email: this.extractEmail(pageText),
-        phone: this.extractPhone(pageText),
-        location: "Mumbai, India",
+        email: this.extractEmail(contactData.pageText),
+        phone: this.extractPhone(contactData.pageText),
+        location: contactData.location || "Mumbai, India",
       };
     } catch (error) {
       return {
