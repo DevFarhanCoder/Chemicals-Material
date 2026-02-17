@@ -108,7 +108,7 @@ export class CombiBlocksScraper extends BaseScraper {
     try {
       // Try to navigate to contact page or extract from footer
       const contactPageUrl = "https://www.combi-blocks.com/contact.htm";
-      
+
       try {
         await this.page.goto(contactPageUrl, {
           waitUntil: "domcontentloaded",
@@ -122,9 +122,9 @@ export class CombiBlocksScraper extends BaseScraper {
       // Extract contact information from specific sections
       const contactData = await this.page.evaluate(() => {
         // Look for contact section, footer, or specific contact elements
+        // @ts-expect-error - document is available in Puppeteer browser context
         const contactSection =
-          document.querySelector(".contact, #contact, footer") ||
-          document.body;
+          document.querySelector(".contact, #contact, footer") || document.body;
         const text = contactSection.textContent || "";
 
         // Extract location from text

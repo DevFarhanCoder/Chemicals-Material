@@ -103,6 +103,7 @@ export class OttoKemiScraper extends BaseScraper {
     try {
       // Try to get contact info from footer or contact section
       const contactData = await this.page.evaluate(() => {
+        // @ts-expect-error - document is available in Puppeteer browser context
         const contactSection =
           document.querySelector(".contact, #contact, footer, .footer") ||
           document.body;

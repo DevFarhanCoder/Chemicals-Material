@@ -10,6 +10,7 @@
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio",
+    "clear:materials": "ts-node src/scripts/clear-materials.ts",
     "scrape": "ts-node src/scrapers/run-all.ts",
     "scrape:combi": "ts-node src/scrapers/run-scraper.ts combi-blocks",
     "scrape:chemsworth": "ts-node src/scrapers/run-scraper.ts chemsworth",
