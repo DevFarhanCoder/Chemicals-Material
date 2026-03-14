@@ -124,7 +124,10 @@ function Dashboard() {
         sourceUrl: "manual-entry",
         sourceSite: "MANUAL",
       });
-      showNotification("Material added successfully. Click fields to edit.", "success");
+      showNotification(
+        "Material added successfully. Click fields to edit.",
+        "success",
+      );
       fetchMaterials();
       fetchStats();
     } catch (error) {

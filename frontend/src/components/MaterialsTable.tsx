@@ -49,7 +49,8 @@ function MaterialsTable({
     field: keyof Material;
     type?: "text" | "textarea";
   }) => {
-    const isEditing = editingCell?.rowId === rowId && editingCell?.field === field;
+    const isEditing =
+      editingCell?.rowId === rowId && editingCell?.field === field;
 
     if (isEditing) {
       const Component = type === "textarea" ? "textarea" : "input";
