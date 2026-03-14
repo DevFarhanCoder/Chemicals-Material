@@ -3,6 +3,7 @@ import { prisma } from "../server";
 import {
   MaterialFiltersSchema,
   UpdateMaterialSchema,
+  CreateMaterialSchema,
 } from "../types/validation";
 import logger from "../config/logger";
 
@@ -99,6 +100,36 @@ export const getMaterial = async (
     }
 
     res.json(material);
+  } catch (error) {
+    return next(error);
+  }
+};
+
+/**
+ * POST /api/materials
+ * Create a new material (admin action)
+ */
+export const createMaterial = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    // Validate create data
+    const createData = CreateMaterialSchema.parse(req.body);
+
+    // Create material with default status
+    const newMaterial = await prisma.material.create({
+      data: {
+        ...createData,
+        status: createData.status || "PENDING",
+        scrapedAt: new Date(),
+      },
+    });
+
+    logger.info(`Material ${newMaterial.id} created manually`);
+
+    res.status(201).json(newMaterial);
   } catch (error) {
     return next(error);
   }

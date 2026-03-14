@@ -113,6 +113,25 @@ function Dashboard() {
     }
   };
 
+  // Handle material add
+  const handleMaterialAdd = async () => {
+    try {
+      // Create a new material with default values
+      await api.createMaterial({
+        caseNo: "000-00-0",
+        productName: "New Product",
+        companyName: "New Company",
+        sourceUrl: "manual-entry",
+        sourceSite: "MANUAL",
+      });
+      showNotification("Material added successfully. Click fields to edit.", "success");
+      fetchMaterials();
+      fetchStats();
+    } catch (error) {
+      showNotification("Failed to add material", "error");
+    }
+  };
+
   // Handle scraping trigger
   const handleTriggerScraping = async () => {
     try {
@@ -184,6 +203,7 @@ function Dashboard() {
             isLoading={isLoading}
             onUpdate={handleMaterialUpdate}
             onDelete={handleMaterialDelete}
+            onAdd={handleMaterialAdd}
             onPageChange={(page: number) =>
               setFilters((prev) => ({ ...prev, page }))
             }

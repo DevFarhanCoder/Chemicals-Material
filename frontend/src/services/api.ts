@@ -44,6 +44,11 @@ class ApiClient {
     return response.data;
   }
 
+  async createMaterial(data: Partial<Material>): Promise<Material> {
+    const response = await this.client.post<Material>("/materials", data);
+    return response.data;
+  }
+
   async updateMaterial(id: string, data: MaterialUpdate): Promise<Material> {
     const response = await this.client.put<Material>(`/materials/${id}`, data);
     return response.data;

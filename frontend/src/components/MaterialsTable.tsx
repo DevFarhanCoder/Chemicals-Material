@@ -16,6 +16,7 @@ interface MaterialsTableProps {
   isLoading: boolean;
   onUpdate: (id: string, updates: Partial<Material>) => void;
   onDelete: (id: string) => void;
+  onAdd: () => void;
   onPageChange: (page: number) => void;
   onSortChange: (sortBy: string, sortOrder: "asc" | "desc") => void;
 }
@@ -26,14 +27,60 @@ function MaterialsTable({
   isLoading,
   onUpdate,
   onDelete,
+  onAdd,
   onPageChange,
   onSortChange,
 }: MaterialsTableProps) {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [editingCell, setEditingCell] = useState<{
     rowId: string;
-    field: "remarks";
+    field: keyof Material;
   } | null>(null);
+
+  // Editable cell component
+  const EditableCell = ({
+    value,
+    rowId,
+    field,
+    type = "text",
+  }: {
+    value: string | null;
+    rowId: string;
+    field: keyof Material;
+    type?: "text" | "textarea";
+  }) => {
+    const isEditing = editingCell?.rowId === rowId && editingCell?.field === field;
+
+    if (isEditing) {
+      const Component = type === "textarea" ? "textarea" : "input";
+      return (
+        <Component
+          autoFocus
+          defaultValue={value || ""}
+          onBlur={(e) => {
+            onUpdate(rowId, { [field]: e.currentTarget.value });
+            setEditingCell(null);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && (type === "text" || e.ctrlKey)) {
+              e.currentTarget.blur();
+            }
+          }}
+          className="text-sm border rounded px-2 py-1 w-full"
+          rows={type === "textarea" ? 2 : undefined}
+        />
+      );
+    }
+
+    return (
+      <div
+        onClick={() => setEditingCell({ rowId, field })}
+        className="text-sm cursor-pointer hover:bg-gray-50 p-1 rounded min-h-[24px]"
+      >
+        {value || <span className="text-gray-400 italic">Click to add...</span>}
+      </div>
+    );
+  };
 
   // Define columns
   const columns = useMemo<ColumnDef<Material>[]>(
@@ -53,7 +100,13 @@ function MaterialsTable({
         header: "CAS No.",
         size: 120,
         cell: ({ row }) => (
-          <div className="font-mono text-xs">{row.original.caseNo}</div>
+          <div className="font-mono text-xs">
+            <EditableCell
+              value={row.original.caseNo}
+              rowId={row.original.id}
+              field="caseNo"
+            />
+          </div>
         ),
       },
       {
@@ -62,8 +115,13 @@ function MaterialsTable({
         size: 250,
         cell: ({ row }) => (
           <div className="max-w-xs">
-            <div className="font-medium text-gray-900 line-clamp-2">
-              {row.original.productName}
+            <div className="font-medium text-gray-900">
+              <EditableCell
+                value={row.original.productName}
+                rowId={row.original.id}
+                field="productName"
+                type="textarea"
+              />
             </div>
           </div>
         ),
@@ -74,7 +132,11 @@ function MaterialsTable({
         size: 100,
         cell: ({ row }) => (
           <div className="text-sm font-medium">
-            {row.original.price || <span className="text-gray-400">-</span>}
+            <EditableCell
+              value={row.original.price}
+              rowId={row.original.id}
+              field="price"
+            />
           </div>
         ),
       },
@@ -90,16 +152,11 @@ function MaterialsTable({
         size: 200,
         cell: ({ row }) => (
           <div className="text-sm">
-            {row.original.email ? (
-              <a
-                href={`mailto:${row.original.email}`}
-                className="text-blue-600 hover:underline"
-              >
-                {row.original.email}
-              </a>
-            ) : (
-              <span className="text-gray-400">-</span>
-            )}
+            <EditableCell
+              value={row.original.email}
+              rowId={row.original.id}
+              field="email"
+            />
           </div>
         ),
       },
@@ -109,11 +166,11 @@ function MaterialsTable({
         size: 130,
         cell: ({ row }) => (
           <div className="text-sm font-mono whitespace-nowrap">
-            {row.original.mobile ? (
-              <span>{String(row.original.mobile)}</span>
-            ) : (
-              <span className="text-gray-400">-</span>
-            )}
+            <EditableCell
+              value={row.original.mobile}
+              rowId={row.original.id}
+              field="mobile"
+            />
           </div>
         ),
       },
@@ -122,7 +179,13 @@ function MaterialsTable({
         header: "Company Name",
         size: 150,
         cell: ({ row }) => (
-          <div className="font-medium">{row.original.companyName}</div>
+          <div className="font-medium">
+            <EditableCell
+              value={row.original.companyName}
+              rowId={row.original.id}
+              field="companyName"
+            />
+          </div>
         ),
       },
       {
@@ -131,7 +194,11 @@ function MaterialsTable({
         size: 150,
         cell: ({ row }) => (
           <div className="text-sm">
-            {row.original.location || <span className="text-gray-400">-</span>}
+            <EditableCell
+              value={row.original.location}
+              rowId={row.original.id}
+              field="location"
+            />
           </div>
         ),
       },
@@ -149,44 +216,14 @@ function MaterialsTable({
         accessorKey: "remarks",
         header: "Remark",
         size: 200,
-        cell: ({ row }) => {
-          const isEditing =
-            editingCell?.rowId === row.original.id &&
-            editingCell?.field === "remarks";
-
-          if (isEditing) {
-            return (
-              <textarea
-                autoFocus
-                defaultValue={row.original.remarks || ""}
-                onBlur={(e) => {
-                  onUpdate(row.original.id, { remarks: e.target.value });
-                  setEditingCell(null);
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && e.ctrlKey) {
-                    e.currentTarget.blur();
-                  }
-                }}
-                className="text-sm border rounded px-2 py-1 w-full"
-                rows={2}
-              />
-            );
-          }
-
-          return (
-            <div
-              onClick={() =>
-                setEditingCell({ rowId: row.original.id, field: "remarks" })
-              }
-              className="text-sm cursor-pointer hover:bg-gray-50 p-1 rounded"
-            >
-              {row.original.remarks || (
-                <span className="text-gray-400 italic">Click to add...</span>
-              )}
-            </div>
-          );
-        },
+        cell: ({ row }) => (
+          <EditableCell
+            value={row.original.remarks}
+            rowId={row.original.id}
+            field="remarks"
+            type="textarea"
+          />
+        ),
       },
       {
         id: "actions",
@@ -239,6 +276,19 @@ function MaterialsTable({
 
   return (
     <div className="card overflow-hidden">
+      {/* Add New Row Button */}
+      <div className="px-6 py-3 bg-gray-50 border-b border-gray-200 flex justify-between items-center">
+        <h3 className="text-sm font-medium text-gray-700">
+          {pagination.total} Materials
+        </h3>
+        <button
+          onClick={onAdd}
+          className="px-4 py-2 bg-primary-600 text-white text-sm font-medium rounded hover:bg-primary-700 transition-colors"
+        >
+          + Add New Row
+        </button>
+      </div>
+
       {/* Table */}
       <div className="overflow-x-auto">
         <table className="min-w-full divide-y divide-gray-200">

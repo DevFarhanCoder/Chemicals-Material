@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { MaterialFilters, MaterialStatus } from "../types";
+import { MaterialFilters } from "../types";
 import { api } from "../services/api";
 
 interface FilterBarProps {
@@ -38,12 +38,11 @@ function FilterBar({ filters, onFilterChange }: FilterBarProps) {
       search: undefined,
       company: undefined,
       location: undefined,
-      status: undefined,
     });
   };
 
   const hasActiveFilters =
-    filters.search || filters.company || filters.location || filters.status;
+    filters.search || filters.company || filters.location;
 
   return (
     <div className="card p-4">
@@ -59,7 +58,7 @@ function FilterBar({ filters, onFilterChange }: FilterBarProps) {
         )}
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {/* Search */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -113,28 +112,6 @@ function FilterBar({ filters, onFilterChange }: FilterBarProps) {
                 {location}
               </option>
             ))}
-          </select>
-        </div>
-
-        {/* Status Filter */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Status
-          </label>
-          <select
-            value={filters.status || ""}
-            onChange={(e) =>
-              onFilterChange({
-                status: (e.target.value as MaterialStatus) || undefined,
-              })
-            }
-            className="select"
-          >
-            <option value="">All Statuses</option>
-            <option value="PENDING">Pending</option>
-            <option value="CONTACTED">Contacted</option>
-            <option value="NOT_INTERESTED">Not Interested</option>
-            <option value="CONVERTED">Converted</option>
           </select>
         </div>
       </div>

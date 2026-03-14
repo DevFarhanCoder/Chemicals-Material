@@ -2,6 +2,7 @@ import { Router } from "express";
 import {
   listMaterials,
   getMaterial,
+  createMaterial,
   updateMaterial,
   deleteMaterial,
   getDistinctValues,
@@ -28,6 +29,12 @@ router.get("/distinct/:field", getDistinctValues);
  * @desc    Get a single material by ID
  */
 router.get("/:id", getMaterial);
+
+/**
+ * @route   POST /api/materials
+ * @desc    Create a new material
+ */
+router.post("/", createMaterial);
 
 /**
  * @route   PUT /api/materials/:id
