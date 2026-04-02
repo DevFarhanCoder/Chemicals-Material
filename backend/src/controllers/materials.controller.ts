@@ -188,9 +188,14 @@ export const updateMaterial = async (
       where: { id },
       data: {
         ...updateData,
-        lastContacted: updateData.lastContacted
-          ? new Date(updateData.lastContacted)
-          : undefined,
+        // Explicitly handle lastContacted so null correctly clears the field
+        ...(updateData.lastContacted !== undefined
+          ? {
+              lastContacted: updateData.lastContacted
+                ? new Date(updateData.lastContacted)
+                : null,
+            }
+          : {}),
       },
     });
 

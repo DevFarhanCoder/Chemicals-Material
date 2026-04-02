@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useCallback, useEffect } from "react";
 import {
   useReactTable,
   getCoreRowModel,
@@ -10,6 +10,122 @@ import {
 import { Material, PaginationInfo } from "../types";
 import { format } from "date-fns";
 
+// =============================================================================
+// EditableCell — defined at MODULE level (outside MaterialsTable).
+//
+// WHY THIS MATTERS: If a component is defined inside another component's render
+// function React treats it as a brand-new type on every render and forcefully
+// unmounts + remounts it — destroying focus and erasing typed text.
+// Defining it here gives it a permanent stable identity.
+// =============================================================================
+interface EditableCellProps {
+  value: string | null;
+  rowId: string;
+  field: string;
+  type?: "text" | "textarea" | "date";
+  onSave: (rowId: string, field: string, value: string | null) => void;
+}
+
+const EditableCell = React.memo(function EditableCell({
+  value,
+  rowId,
+  field,
+  type = "text",
+  onSave,
+}: EditableCellProps) {
+  const [isEditing, setIsEditing] = useState(false);
+
+  // Derive the input-ready representation of value.
+  // Date inputs need "YYYY-MM-DD"; everything else is the raw string.
+  const toLocal = (v: string | null) =>
+    type === "date" ? (v ? v.split("T")[0] : "") : (v ?? "");
+
+  const [localValue, setLocalValue] = useState<string>(() => toLocal(value));
+
+  // When the parent's optimistic update changes `value`, sync only if not editing.
+  useEffect(() => {
+    if (!isEditing) setLocalValue(toLocal(value));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value, isEditing]);
+
+  const commit = () => {
+    setIsEditing(false);
+    if (type === "date") {
+      const iso = localValue
+        ? new Date(localValue + "T00:00:00").toISOString()
+        : null;
+      if (iso !== value) onSave(rowId, field, iso);
+    } else {
+      const trimmed = localValue.trimEnd();
+      if (trimmed !== (value ?? "")) onSave(rowId, field, trimmed || null);
+    }
+  };
+
+  const cancel = () => {
+    setIsEditing(false);
+    setLocalValue(toLocal(value));
+  };
+
+  if (isEditing) {
+    if (type === "date") {
+      return (
+        <input
+          type="date"
+          autoFocus
+          value={localValue}
+          onChange={(e) => setLocalValue(e.target.value)}
+          onBlur={commit}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") e.currentTarget.blur();
+            if (e.key === "Escape") cancel();
+          }}
+          className="text-sm border border-blue-400 rounded px-2 py-1 w-full outline-none focus:ring-2 focus:ring-blue-200"
+        />
+      );
+    }
+    const Tag = type === "textarea" ? "textarea" : "input";
+    return (
+      <Tag
+        autoFocus
+        value={localValue}
+        onChange={(e) => setLocalValue(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" && (type === "text" || e.ctrlKey))
+            e.currentTarget.blur();
+          if (e.key === "Escape") cancel();
+        }}
+        className="text-sm border border-blue-400 rounded px-2 py-1 w-full outline-none focus:ring-2 focus:ring-blue-200"
+        rows={type === "textarea" ? 2 : undefined}
+      />
+    );
+  }
+
+  let display: React.ReactNode = localValue;
+  if (type === "date" && localValue) {
+    try {
+      display = format(new Date(localValue), "MMM dd, yyyy");
+    } catch {
+      display = localValue;
+    }
+  }
+
+  return (
+    <div
+      onClick={() => setIsEditing(true)}
+      title="Click to edit"
+      className="text-sm cursor-pointer hover:bg-blue-50 p-1 rounded min-h-[24px]"
+    >
+      {display || (
+        <span className="text-gray-400 italic text-xs">Click to edit</span>
+      )}
+    </div>
+  );
+});
+
+// =============================================================================
+// MaterialsTable
+// =============================================================================
 interface MaterialsTableProps {
   materials: Material[];
   pagination: PaginationInfo;
@@ -32,133 +148,57 @@ function MaterialsTable({
   onSortChange,
 }: MaterialsTableProps) {
   const [sorting, setSorting] = useState<SortingState>([]);
-  const [editingCell, setEditingCell] = useState<{
-    rowId: string;
-    field: keyof Material;
-  } | null>(null);
 
-  // Editable cell component
-  const EditableCell = ({
-    value,
-    rowId,
-    field,
-    type = "text",
-  }: {
-    value: string | null;
-    rowId: string;
-    field: keyof Material;
-    type?: "text" | "textarea" | "date";
-  }) => {
-    const isEditing =
-      editingCell?.rowId === rowId && editingCell?.field === field;
+  // Single stable save handler — EditableCells get a consistent function ref
+  // so React.memo keeps them from re-rendering unnecessarily.
+  const handleCellSave = useCallback(
+    (rowId: string, field: string, value: string | null) => {
+      onUpdate(rowId, { [field]: value });
+    },
+    [onUpdate],
+  );
 
-    if (isEditing) {
-      if (type === "date") {
-        return (
-          <input
-            type="date"
-            autoFocus
-            defaultValue={value ? value.split("T")[0] : ""}
-            onBlur={(e) => {
-              const dateValue = e.currentTarget.value;
-              if (dateValue) {
-                onUpdate(rowId, { [field]: new Date(dateValue).toISOString() });
-              } else {
-                onUpdate(rowId, { [field]: null });
-              }
-              setEditingCell(null);
-            }}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") e.currentTarget.blur();
-              if (e.key === "Escape") setEditingCell(null);
-            }}
-            className="text-sm border rounded px-2 py-1 w-full"
-          />
-        );
-      }
-      const Component = type === "textarea" ? "textarea" : "input";
-      return (
-        <Component
-          autoFocus
-          defaultValue={value || ""}
-          onBlur={(e) => {
-            onUpdate(rowId, { [field]: e.currentTarget.value });
-            setEditingCell(null);
-          }}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && (type === "text" || e.ctrlKey)) {
-              e.currentTarget.blur();
-            }
-          }}
-          className="text-sm border rounded px-2 py-1 w-full"
-          rows={type === "textarea" ? 2 : undefined}
-        />
-      );
-    }
+  const pageOffset = (pagination.page - 1) * pagination.limit;
 
-    let displayValue: React.ReactNode = value;
-    if (type === "date" && value) {
-      try {
-        displayValue = format(new Date(value), "MMM dd, yyyy");
-      } catch {
-        displayValue = value;
-      }
-    }
-
-    return (
-      <div
-        onClick={() => setEditingCell({ rowId, field })}
-        className="text-sm cursor-pointer hover:bg-gray-50 p-1 rounded min-h-[24px]"
-      >
-        {displayValue || (
-          <span className="text-gray-400 italic">Click to add...</span>
-        )}
-      </div>
-    );
-  };
-
-  // Define columns
+  // Columns do NOT depend on any editing state, so the table never forcefully
+  // remounts cells while someone is typing.
   const columns = useMemo<ColumnDef<Material>[]>(
     () => [
       {
         id: "srNo",
         header: "Sr. No.",
-        size: 80,
+        size: 70,
         cell: ({ row }) => (
-          <div className="text-sm font-medium">
-            {(pagination.page - 1) * pagination.limit + row.index + 1}
+          <div className="text-sm font-medium text-center">
+            {pageOffset + row.index + 1}
           </div>
         ),
       },
       {
         accessorKey: "caseNo",
         header: "CAS No.",
-        size: 120,
+        size: 130,
         cell: ({ row }) => (
-          <div className="font-mono text-xs">
-            <EditableCell
-              value={row.original.caseNo}
-              rowId={row.original.id}
-              field="caseNo"
-            />
-          </div>
+          <EditableCell
+            value={row.original.caseNo}
+            rowId={row.original.id}
+            field="caseNo"
+            onSave={handleCellSave}
+          />
         ),
       },
       {
         accessorKey: "productName",
         header: "Product Name",
-        size: 250,
+        size: 240,
         cell: ({ row }) => (
-          <div className="max-w-xs">
-            <div className="font-medium text-gray-900">
-              <EditableCell
-                value={row.original.productName}
-                rowId={row.original.id}
-                field="productName"
-                type="textarea"
-              />
-            </div>
-          </div>
+          <EditableCell
+            value={row.original.productName}
+            rowId={row.original.id}
+            field="productName"
+            type="textarea"
+            onSave={handleCellSave}
+          />
         ),
       },
       {
@@ -166,27 +206,25 @@ function MaterialsTable({
         header: "Price",
         size: 100,
         cell: ({ row }) => (
-          <div className="text-sm font-medium">
-            <EditableCell
-              value={row.original.price}
-              rowId={row.original.id}
-              field="price"
-            />
-          </div>
+          <EditableCell
+            value={row.original.price}
+            rowId={row.original.id}
+            field="price"
+            onSave={handleCellSave}
+          />
         ),
       },
       {
-        id: "unit",
+        accessorKey: "unit",
         header: "Unit",
         size: 80,
         cell: ({ row }) => (
-          <div className="text-sm">
-            <EditableCell
-              value={row.original.unit}
-              rowId={row.original.id}
-              field="unit"
-            />
-          </div>
+          <EditableCell
+            value={row.original.unit}
+            rowId={row.original.id}
+            field="unit"
+            onSave={handleCellSave}
+          />
         ),
       },
       {
@@ -194,13 +232,12 @@ function MaterialsTable({
         header: "Email ID",
         size: 200,
         cell: ({ row }) => (
-          <div className="text-sm">
-            <EditableCell
-              value={row.original.email}
-              rowId={row.original.id}
-              field="email"
-            />
-          </div>
+          <EditableCell
+            value={row.original.email}
+            rowId={row.original.id}
+            field="email"
+            onSave={handleCellSave}
+          />
         ),
       },
       {
@@ -208,13 +245,12 @@ function MaterialsTable({
         header: "Contact No.",
         size: 130,
         cell: ({ row }) => (
-          <div className="text-sm font-mono whitespace-nowrap">
-            <EditableCell
-              value={row.original.mobile}
-              rowId={row.original.id}
-              field="mobile"
-            />
-          </div>
+          <EditableCell
+            value={row.original.mobile}
+            rowId={row.original.id}
+            field="mobile"
+            onSave={handleCellSave}
+          />
         ),
       },
       {
@@ -222,13 +258,12 @@ function MaterialsTable({
         header: "Company Name",
         size: 150,
         cell: ({ row }) => (
-          <div className="font-medium">
-            <EditableCell
-              value={row.original.companyName}
-              rowId={row.original.id}
-              field="companyName"
-            />
-          </div>
+          <EditableCell
+            value={row.original.companyName}
+            rowId={row.original.id}
+            field="companyName"
+            onSave={handleCellSave}
+          />
         ),
       },
       {
@@ -236,13 +271,12 @@ function MaterialsTable({
         header: "State Location",
         size: 150,
         cell: ({ row }) => (
-          <div className="text-sm">
-            <EditableCell
-              value={row.original.location}
-              rowId={row.original.id}
-              field="location"
-            />
-          </div>
+          <EditableCell
+            value={row.original.location}
+            rowId={row.original.id}
+            field="location"
+            onSave={handleCellSave}
+          />
         ),
       },
       {
@@ -250,14 +284,13 @@ function MaterialsTable({
         header: "Date",
         size: 150,
         cell: ({ row }) => (
-          <div className="text-sm">
-            <EditableCell
-              value={row.original.lastContacted}
-              rowId={row.original.id}
-              field="lastContacted"
-              type="date"
-            />
-          </div>
+          <EditableCell
+            value={row.original.lastContacted}
+            rowId={row.original.id}
+            field="lastContacted"
+            type="date"
+            onSave={handleCellSave}
+          />
         ),
       },
       {
@@ -270,40 +303,36 @@ function MaterialsTable({
             rowId={row.original.id}
             field="remarks"
             type="textarea"
+            onSave={handleCellSave}
           />
         ),
       },
       {
         id: "actions",
-        header: "Add/ Delete",
-        size: 120,
+        header: "Delete",
+        size: 80,
         cell: ({ row }) => (
-          <div className="flex gap-2">
-            <button
-              onClick={() => onDelete(row.original.id)}
-              className="text-red-600 hover:text-red-700 text-sm font-medium"
-            >
-              Delete
-            </button>
-          </div>
+          <button
+            onClick={() => onDelete(row.original.id)}
+            className="text-red-600 hover:text-red-700 text-sm font-medium px-2 py-1 rounded hover:bg-red-50 transition-colors"
+          >
+            Delete
+          </button>
         ),
       },
     ],
-    [editingCell, onUpdate, onDelete, pagination],
+    [pageOffset, handleCellSave, onDelete],
   );
 
   const table = useReactTable({
     data: materials,
     columns,
-    state: {
-      sorting,
-    },
+    state: { sorting },
     onSortingChange: (updater) => {
       setSorting(updater);
-      const newSorting =
-        typeof updater === "function" ? updater(sorting) : updater;
-      if (newSorting.length > 0) {
-        onSortChange(newSorting[0].id, newSorting[0].desc ? "desc" : "asc");
+      const next = typeof updater === "function" ? updater(sorting) : updater;
+      if (next.length > 0) {
+        onSortChange(next[0].id, next[0].desc ? "desc" : "asc");
       }
     },
     getCoreRowModel: getCoreRowModel(),
@@ -315,7 +344,7 @@ function MaterialsTable({
     return (
       <div className="card p-8">
         <div className="text-center text-gray-500">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600 mx-auto mb-4"></div>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600 mx-auto mb-4" />
           Loading materials...
         </div>
       </div>
@@ -324,7 +353,7 @@ function MaterialsTable({
 
   return (
     <div className="card overflow-hidden">
-      {/* Add New Row Button */}
+      {/* Toolbar */}
       <div className="px-6 py-3 bg-gray-50 border-b border-gray-200 flex justify-between items-center">
         <h3 className="text-sm font-medium text-gray-700">
           {pagination.total} Materials
@@ -346,7 +375,7 @@ function MaterialsTable({
                 {headerGroup.headers.map((header) => (
                   <th
                     key={header.id}
-                    className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                    className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-100 select-none"
                     style={{ width: header.getSize() }}
                     onClick={header.column.getToggleSortingHandler()}
                   >
@@ -367,129 +396,126 @@ function MaterialsTable({
             ))}
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
-            {table.getRowModel().rows.map((row) => (
-              <tr key={row.id} className="hover:bg-gray-50 transition-colors">
-                {row.getVisibleCells().map((cell) => (
-                  <td key={cell.id} className="table-cell">
-                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                  </td>
-                ))}
+            {materials.length === 0 ? (
+              <tr>
+                <td
+                  colSpan={columns.length}
+                  className="px-6 py-12 text-center text-gray-400"
+                >
+                  No materials found.
+                </td>
               </tr>
-            ))}
+            ) : (
+              table.getRowModel().rows.map((row) => (
+                <tr key={row.id} className="hover:bg-gray-50 transition-colors">
+                  {row.getVisibleCells().map((cell) => (
+                    <td key={cell.id} className="table-cell">
+                      {flexRender(
+                        cell.column.columnDef.cell,
+                        cell.getContext(),
+                      )}
+                    </td>
+                  ))}
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
       </div>
 
       {/* Pagination */}
-      {pagination.totalPages > 1 && (
-        <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-between">
+      {pagination.totalPages >= 1 && (
+        <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-between flex-wrap gap-3">
           <div className="text-sm text-gray-700">
             Showing{" "}
             <span className="font-medium">
-              {(pagination.page - 1) * pagination.limit + 1}
-            </span>{" "}
-            to{" "}
+              {pagination.total === 0
+                ? 0
+                : (pagination.page - 1) * pagination.limit + 1}
+            </span>
+            {" – "}
             <span className="font-medium">
               {Math.min(pagination.page * pagination.limit, pagination.total)}
             </span>{" "}
-            of <span className="font-medium">{pagination.total}</span> results
+            of <span className="font-medium">{pagination.total}</span> entries
           </div>
 
-          <div className="flex gap-2">
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => onPageChange(1)}
+              disabled={pagination.page === 1}
+              className="px-2 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              «
+            </button>
             <button
               onClick={() => onPageChange(pagination.page - 1)}
               disabled={pagination.page === 1}
-              className="px-3 py-1 border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-3 py-1 text-sm border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
             >
-              Previous
+              ‹ Prev
             </button>
 
-            {/* Page numbers */}
-            <div className="flex gap-1">
-              {Array.from({ length: pagination.totalPages }, (_, i) => i + 1)
-                .filter((page) => {
-                  // Show first, last, current, and pages around current
-                  return (
-                    page === 1 ||
-                    page === pagination.totalPages ||
-                    Math.abs(page - pagination.page) <= 1
-                  );
-                })
-                .map((page, index, array) => {
-                  // Add ellipsis
-                  if (index > 0 && page - array[index - 1] > 1) {
-                    return [
-                      <span
-                        key={`ellipsis-${page}`}
-                        className="px-3 py-1 text-gray-500"
-                      >
-                        ...
-                      </span>,
-                      <button
-                        key={page}
-                        onClick={() => onPageChange(page)}
-                        className={`px-3 py-1 border rounded ${
-                          pagination.page === page
-                            ? "bg-primary-600 text-white border-primary-600"
-                            : "border-gray-300 hover:bg-gray-50"
-                        }`}
-                      >
-                        {page}
-                      </button>,
-                    ];
-                  }
-
-                  return (
-                    <button
-                      key={page}
-                      onClick={() => onPageChange(page)}
-                      className={`px-3 py-1 border rounded ${
-                        pagination.page === page
-                          ? "bg-primary-600 text-white border-primary-600"
-                          : "border-gray-300 hover:bg-gray-50"
-                      }`}
-                    >
-                      {page}
-                    </button>
-                  );
-                })}
-            </div>
+            {buildPageNumbers(pagination.page, pagination.totalPages).map(
+              (item, i) =>
+                item === "..." ? (
+                  <span
+                    key={`ell-${i}`}
+                    className="px-2 py-1 text-gray-400 text-sm select-none"
+                  >
+                    …
+                  </span>
+                ) : (
+                  <button
+                    key={item}
+                    onClick={() => onPageChange(item as number)}
+                    className={`px-3 py-1 text-sm border rounded transition-colors ${
+                      pagination.page === item
+                        ? "bg-primary-600 text-white border-primary-600 font-semibold"
+                        : "border-gray-300 hover:bg-gray-50"
+                    }`}
+                  >
+                    {item}
+                  </button>
+                ),
+            )}
 
             <button
               onClick={() => onPageChange(pagination.page + 1)}
               disabled={pagination.page === pagination.totalPages}
-              className="px-3 py-1 border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-3 py-1 text-sm border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
             >
-              Next
+              Next ›
+            </button>
+            <button
+              onClick={() => onPageChange(pagination.totalPages)}
+              disabled={pagination.page === pagination.totalPages}
+              className="px-2 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              »
             </button>
           </div>
         </div>
       )}
-
-      {/* Empty state */}
-      {materials.length === 0 && !isLoading && (
-        <div className="text-center py-12 text-gray-500">
-          <svg
-            className="mx-auto h-12 w-12 text-gray-400"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-            />
-          </svg>
-          <h3 className="mt-2 text-sm font-medium">No materials found</h3>
-          <p className="mt-1 text-sm">
-            Try adjusting your filters or run the scrapers to fetch data.
-          </p>
-        </div>
-      )}
     </div>
   );
+}
+
+/** Returns a compact page list like [1, "...", 4, 5, 6, "...", 20] */
+function buildPageNumbers(current: number, total: number): (number | "...")[] {
+  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+  const result: (number | "...")[] = [1];
+  if (current > 3) result.push("...");
+  for (
+    let p = Math.max(2, current - 1);
+    p <= Math.min(total - 1, current + 1);
+    p++
+  ) {
+    result.push(p);
+  }
+  if (current < total - 2) result.push("...");
+  result.push(total);
+  return result;
 }
 
 export default MaterialsTable;

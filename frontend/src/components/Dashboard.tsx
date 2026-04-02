@@ -1,6 +1,11 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { api } from "../services/api";
-import { Material, MaterialFilters, DashboardStats } from "../types";
+import {
+  Material,
+  MaterialFilters,
+  DashboardStats,
+  MaterialUpdate,
+} from "../types";
 import MaterialsTable from "./MaterialsTable";
 import FilterBar from "./FilterBar";
 import StatsPanel from "./StatsPanel";
@@ -11,13 +16,13 @@ function Dashboard() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [filters, setFilters] = useState<MaterialFilters>({
     page: 1,
-    limit: 50,
+    limit: 20,
     sortBy: "createdAt",
     sortOrder: "desc",
   });
   const [pagination, setPagination] = useState({
     page: 1,
-    limit: 50,
+    limit: 20,
     total: 0,
     totalPages: 0,
   });
@@ -26,6 +31,7 @@ function Dashboard() {
     message: string;
     type: "success" | "error" | "info";
   } | null>(null);
+  const notifTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Fetch materials
   const fetchMaterials = async () => {
@@ -57,14 +63,18 @@ function Dashboard() {
     fetchStats();
   }, [filters]);
 
-  // Show notification
-  const showNotification = (
-    message: string,
-    type: "success" | "error" | "info",
-  ) => {
-    setNotification({ message, type });
-    setTimeout(() => setNotification(null), 5000);
-  };
+  // Show notification — stable reference via useCallback
+  const showNotification = useCallback(
+    (message: string, type: "success" | "error" | "info") => {
+      setNotification({ message, type });
+      if (notifTimer.current) clearTimeout(notifTimer.current);
+      notifTimer.current = setTimeout(
+        () => setNotification(null),
+        type === "success" ? 2000 : 5000,
+      );
+    },
+    [],
+  );
 
   // Handle filter changes
   const handleFilterChange = (newFilters: Partial<MaterialFilters>) => {
@@ -75,27 +85,32 @@ function Dashboard() {
     }));
   };
 
-  // Handle material update
-  const handleMaterialUpdate = async (
-    id: string,
-    updates: Partial<Material>,
-  ) => {
-    try {
-      // Convert null to undefined for API compatibility
-      const cleanedUpdates = {
-        ...updates,
-        remarks: updates.remarks === null ? undefined : updates.remarks,
-        lastContacted:
-          updates.lastContacted === null ? undefined : updates.lastContacted,
-      };
-      await api.updateMaterial(id, cleanedUpdates);
-      showNotification("Material updated successfully", "success");
-      fetchMaterials();
-      fetchStats();
-    } catch (error) {
-      showNotification("Failed to update material", "error");
-    }
-  };
+  // Handle material update — optimistic: update local state immediately,
+  // save to server in the background. No full page re-fetch on success.
+  const handleMaterialUpdate = useCallback(
+    async (id: string, updates: Partial<Material>) => {
+      // Capture original for rollback
+      let original: Material | undefined;
+      setMaterials((prev) => {
+        original = prev.find((m) => m.id === id);
+        return prev.map((m) => (m.id === id ? { ...m, ...updates } : m));
+      });
+
+      try {
+        await api.updateMaterial(id, updates as MaterialUpdate);
+        showNotification("Saved", "success");
+      } catch {
+        // Revert on failure
+        if (original) {
+          setMaterials((prev) =>
+            prev.map((m) => (m.id === id ? original! : m)),
+          );
+        }
+        showNotification("Failed to save — change reverted", "error");
+      }
+    },
+    [showNotification],
+  );
 
   // Handle material delete
   const handleMaterialDelete = async (id: string) => {
