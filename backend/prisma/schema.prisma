@@ -19,6 +19,7 @@ model Material {
   companyName   String    @map("company_name") @db.VarChar(255)
   location      String?   @db.VarChar(255)
   price         String?   @db.VarChar(100)
+  unit          String?   @db.VarChar(50)
   status        Status    @default(PENDING)
   remarks       String?   @db.Text
   lastContacted DateTime? @map("last_contacted")

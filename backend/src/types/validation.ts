@@ -8,6 +8,7 @@ export const MaterialSchema = z.object({
   companyName: z.string().min(1).max(255),
   location: z.string().max(255).optional().nullable(),
   price: z.string().max(100).optional().nullable(),
+  unit: z.string().max(50).optional().nullable(),
   status: z
     .enum(["PENDING", "CONTACTED", "NOT_INTERESTED", "CONVERTED"])
     .optional(),
@@ -15,8 +16,10 @@ export const MaterialSchema = z.object({
   lastContacted: z.string().datetime().optional().nullable(),
 });
 
-// Update material schema (partial)
-export const UpdateMaterialSchema = MaterialSchema.partial();
+// Update material schema (partial) - also allows updating caseNo
+export const UpdateMaterialSchema = MaterialSchema.partial().extend({
+  caseNo: z.string().min(1).max(50).optional(),
+});
 
 // Create material schema (required fields only)
 export const CreateMaterialSchema = z.object({
@@ -29,6 +32,7 @@ export const CreateMaterialSchema = z.object({
   mobile: z.string().max(50).optional().nullable(),
   location: z.string().max(255).optional().nullable(),
   price: z.string().max(100).optional().nullable(),
+  unit: z.string().max(50).optional().nullable(),
   status: z
     .enum(["PENDING", "CONTACTED", "NOT_INTERESTED", "CONVERTED"])
     .optional(),

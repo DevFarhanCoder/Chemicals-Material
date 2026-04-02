@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import React, { useState, useMemo } from "react";
 import {
   useReactTable,
   getCoreRowModel,
@@ -47,12 +47,35 @@ function MaterialsTable({
     value: string | null;
     rowId: string;
     field: keyof Material;
-    type?: "text" | "textarea";
+    type?: "text" | "textarea" | "date";
   }) => {
     const isEditing =
       editingCell?.rowId === rowId && editingCell?.field === field;
 
     if (isEditing) {
+      if (type === "date") {
+        return (
+          <input
+            type="date"
+            autoFocus
+            defaultValue={value ? value.split("T")[0] : ""}
+            onBlur={(e) => {
+              const dateValue = e.currentTarget.value;
+              if (dateValue) {
+                onUpdate(rowId, { [field]: new Date(dateValue).toISOString() });
+              } else {
+                onUpdate(rowId, { [field]: null });
+              }
+              setEditingCell(null);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") e.currentTarget.blur();
+              if (e.key === "Escape") setEditingCell(null);
+            }}
+            className="text-sm border rounded px-2 py-1 w-full"
+          />
+        );
+      }
       const Component = type === "textarea" ? "textarea" : "input";
       return (
         <Component
@@ -73,12 +96,23 @@ function MaterialsTable({
       );
     }
 
+    let displayValue: React.ReactNode = value;
+    if (type === "date" && value) {
+      try {
+        displayValue = format(new Date(value), "MMM dd, yyyy");
+      } catch {
+        displayValue = value;
+      }
+    }
+
     return (
       <div
         onClick={() => setEditingCell({ rowId, field })}
         className="text-sm cursor-pointer hover:bg-gray-50 p-1 rounded min-h-[24px]"
       >
-        {value || <span className="text-gray-400 italic">Click to add...</span>}
+        {displayValue || (
+          <span className="text-gray-400 italic">Click to add...</span>
+        )}
       </div>
     );
   };
@@ -145,7 +179,15 @@ function MaterialsTable({
         id: "unit",
         header: "Unit",
         size: 80,
-        cell: () => <div className="text-sm text-gray-500">-</div>,
+        cell: ({ row }) => (
+          <div className="text-sm">
+            <EditableCell
+              value={row.original.unit}
+              rowId={row.original.id}
+              field="unit"
+            />
+          </div>
+        ),
       },
       {
         accessorKey: "email",
@@ -204,12 +246,17 @@ function MaterialsTable({
         ),
       },
       {
-        accessorKey: "createdAt",
+        accessorKey: "lastContacted",
         header: "Date",
-        size: 120,
+        size: 150,
         cell: ({ row }) => (
           <div className="text-sm">
-            {format(new Date(row.original.createdAt), "MMM dd, yyyy")}
+            <EditableCell
+              value={row.original.lastContacted}
+              rowId={row.original.id}
+              field="lastContacted"
+              type="date"
+            />
           </div>
         ),
       },

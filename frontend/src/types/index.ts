@@ -14,6 +14,7 @@ export interface Material {
   companyName: string;
   location: string | null;
   price: string | null;
+  unit: string | null;
   status: MaterialStatus;
   remarks: string | null;
   lastContacted: string | null;
@@ -32,6 +33,7 @@ export interface MaterialUpdate {
   companyName?: string;
   location?: string | null;
   price?: string | null;
+  unit?: string | null;
   status?: MaterialStatus;
   remarks?: string | null;
   lastContacted?: string | null;
