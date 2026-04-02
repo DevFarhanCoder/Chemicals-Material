@@ -12,7 +12,7 @@ datasource db {
 // Main materials table - stores scraped product data
 model Material {
   id            String    @id @default(uuid())
-  caseNo        String    @unique @map("case_no") @db.VarChar(50)
+  caseNo        String    @map("case_no") @db.VarChar(50)
   productName   String    @map("product_name") @db.Text
   email         String?   @db.VarChar(255)
   mobile        String?   @db.VarChar(50)
