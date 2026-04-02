@@ -23,6 +23,10 @@ export const prisma = new PrismaClient();
 const app: Express = express();
 const PORT = process.env.PORT || 5000;
 
+// CRITICAL for Render/Heroku/any reverse-proxy deployment:
+// Without this, ALL users share the proxy's IP and hit the rate limit together.
+app.set("trust proxy", 1);
+
 // ============================================================================
 // MIDDLEWARE
 // ============================================================================
@@ -50,15 +54,28 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Rate limiting
+// General API limiter — generous since this is an admin-only dashboard.
 const limiter = rateLimit({
-  windowMs: parseInt(process.env.API_RATE_LIMIT_WINDOW_MS || "900000"), // 15 minutes
-  max: parseInt(process.env.API_RATE_LIMIT_MAX_REQUESTS || "100"),
+  windowMs: parseInt(process.env.API_RATE_LIMIT_WINDOW_MS || "900000"), // 15 min
+  max: parseInt(process.env.API_RATE_LIMIT_MAX_REQUESTS || "1000"),
   message: "Too many requests from this IP, please try again later.",
+  standardHeaders: true,
+  legacyHeaders: false,
+  // Skip rate-limiting for health checks
+  skip: (req) => req.path === "/health",
+});
+
+// Scraping limiter — stricter, scraping jobs are expensive
+const scrapingLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 10,
+  message: "Too many scraping requests. Please wait before triggering again.",
   standardHeaders: true,
   legacyHeaders: false,
 });
 
 app.use("/api/", limiter);
+app.use("/api/scraping/trigger", scrapingLimiter);
 
 // Request logging
 app.use((req: Request, _res: Response, next: NextFunction) => {

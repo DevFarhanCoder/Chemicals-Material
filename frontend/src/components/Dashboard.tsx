@@ -175,8 +175,7 @@ function Dashboard() {
       {/* Header */}
       <header className="bg-white shadow-sm border-b border-gray-200">
         <div className="max-w-[1920px] mx-auto px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div>
+          <div>
               <h1 className="text-2xl font-bold text-gray-900">
                 Chemical Materials Dashboard
               </h1>
@@ -184,24 +183,6 @@ function Dashboard() {
                 Admin-only material aggregation from supplier websites
               </p>
             </div>
-            <div className="flex gap-3">
-              <button
-                onClick={handleRefresh}
-                className="btn btn-secondary"
-                disabled={isLoading}
-              >
-                <span className="mr-2">🔄</span>
-                Refresh
-              </button>
-              <button
-                onClick={handleTriggerScraping}
-                className="btn btn-primary"
-              >
-                <span className="mr-2">🕷️</span>
-                Run Scrapers
-              </button>
-            </div>
-          </div>
         </div>
       </header>
 
