@@ -36,9 +36,17 @@ const EditableCell = React.memo(function EditableCell({
   const [isEditing, setIsEditing] = useState(false);
 
   // Derive the input-ready representation of value.
-  // Date inputs need "YYYY-MM-DD"; everything else is the raw string.
-  const toLocal = (v: string | null) =>
-    type === "date" ? (v ? v.split("T")[0] : "") : (v ?? "");
+  // Date inputs need "YYYY-MM-DD". We extract UTC date parts so the value
+  // never shifts by the local timezone offset (fixes "saved Oct 7, shows Oct 6").
+  const toLocal = (v: string | null) => {
+    if (type !== "date") return v ?? "";
+    if (!v) return "";
+    const d = new Date(v);
+    const y = d.getUTCFullYear();
+    const mo = String(d.getUTCMonth() + 1).padStart(2, "0");
+    const day = String(d.getUTCDate()).padStart(2, "0");
+    return `${y}-${mo}-${day}`;
+  };
 
   const [localValue, setLocalValue] = useState<string>(() => toLocal(value));
 
@@ -51,9 +59,10 @@ const EditableCell = React.memo(function EditableCell({
   const commit = () => {
     setIsEditing(false);
     if (type === "date") {
-      const iso = localValue
-        ? new Date(localValue + "T00:00:00").toISOString()
-        : null;
+      // Store as UTC midnight string e.g. "2026-10-07T00:00:00.000Z".
+      // Do NOT use new Date(str).toISOString() — that shifts by local offset
+      // (IST +5:30 turns Oct 7 00:00 local → Oct 6 18:30 UTC → wrong day stored).
+      const iso = localValue ? `${localValue}T00:00:00.000Z` : null;
       if (iso !== value) onSave(rowId, field, iso);
     } else {
       const trimmed = localValue.trimEnd();
@@ -104,7 +113,9 @@ const EditableCell = React.memo(function EditableCell({
   let display: React.ReactNode = localValue;
   if (type === "date" && localValue) {
     try {
-      display = format(new Date(localValue), "MMM dd, yyyy");
+      // Build from parts directly — avoids local offset shifting the date on display
+      const [y, mo, d] = localValue.split("-").map(Number);
+      display = format(new Date(y, mo - 1, d), "MMM dd, yyyy");
     } catch {
       display = localValue;
     }
