@@ -150,9 +150,10 @@ function MaterialsTable({
   onSortChange,
 }: MaterialsTableProps) {
   const [sorting, setSorting] = useState<SortingState>([]);
+  const [selectMode, setSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
-  // Clear selection whenever the page data changes
+  // Clear selection when page data changes or select mode is turned off
   useEffect(() => {
     setSelectedIds(new Set());
   }, [materials]);
@@ -163,11 +164,7 @@ function MaterialsTable({
   const someSelected = selectedIds.size > 0;
 
   const toggleAll = () => {
-    if (allSelected) {
-      setSelectedIds(new Set());
-    } else {
-      setSelectedIds(new Set(allPageIds));
-    }
+    setSelectedIds(allSelected ? new Set() : new Set(allPageIds));
   };
 
   const toggleRow = (id: string) => {
@@ -178,11 +175,16 @@ function MaterialsTable({
     });
   };
 
+  const exitSelectMode = () => {
+    setSelectMode(false);
+    setSelectedIds(new Set());
+  };
+
   const handleBulkDelete = () => {
     const ids = Array.from(selectedIds);
     if (!window.confirm(`Delete ${ids.length} selected row(s)?`)) return;
     onDeleteMany(ids);
-    setSelectedIds(new Set());
+    exitSelectMode();
   };
 
   // Single stable save handler — EditableCells get a consistent function ref
@@ -203,36 +205,34 @@ function MaterialsTable({
       {
         id: "select",
         size: 44,
-        header: () => (
-          <input
-            type="checkbox"
-            checked={allSelected}
-            ref={(el) => {
-              if (el) el.indeterminate = someSelected && !allSelected;
-            }}
-            onChange={toggleAll}
-            className="w-4 h-4 rounded border-gray-300 text-primary-600 cursor-pointer"
-            title={allSelected ? "Deselect all" : "Select all on this page"}
-          />
-        ),
-        cell: ({ row }) => (
-          <input
-            type="checkbox"
-            checked={selectedIds.has(row.original.id)}
-            onChange={() => toggleRow(row.original.id)}
-            className="w-4 h-4 rounded border-gray-300 text-primary-600 cursor-pointer"
-          />
-        ),
-      },
-      {
-        id: "srNo",
-        header: "Sr. No.",
-        size: 70,
-        cell: ({ row }) => (
-          <div className="text-sm font-medium text-center">
-            {pageOffset + row.index + 1}
-          </div>
-        ),
+        header: () =>
+          selectMode ? (
+            <input
+              type="checkbox"
+              checked={allSelected}
+              ref={(el) => {
+                if (el) el.indeterminate = someSelected && !allSelected;
+              }}
+              onChange={toggleAll}
+              className="w-4 h-4 rounded border-gray-300 cursor-pointer"
+              title={allSelected ? "Deselect all" : "Select all"}
+            />
+          ) : (
+            <span className="text-xs font-medium text-gray-700">#</span>
+          ),
+        cell: ({ row }) =>
+          selectMode ? (
+            <input
+              type="checkbox"
+              checked={selectedIds.has(row.original.id)}
+              onChange={() => toggleRow(row.original.id)}
+              className="w-4 h-4 rounded border-gray-300 cursor-pointer"
+            />
+          ) : (
+            <div className="text-sm font-medium text-center">
+              {pageOffset + row.index + 1}
+            </div>
+          ),
       },
       {
         accessorKey: "caseNo",
@@ -385,6 +385,7 @@ function MaterialsTable({
       pageOffset,
       handleCellSave,
       onDelete,
+      selectMode,
       selectedIds,
       allSelected,
       someSelected,
@@ -428,19 +429,36 @@ function MaterialsTable({
           <h3 className="text-sm font-medium text-gray-700">
             {pagination.total} Materials
           </h3>
-          {someSelected && (
+          {selectMode && someSelected && (
             <span className="text-sm text-blue-700 font-medium">
               {selectedIds.size} selected
             </span>
           )}
         </div>
         <div className="flex items-center gap-2">
-          {someSelected && (
+          {selectMode ? (
+            <>
+              {someSelected && (
+                <button
+                  onClick={handleBulkDelete}
+                  className="px-4 py-2 bg-red-600 text-white text-sm font-medium rounded hover:bg-red-700 transition-colors"
+                >
+                  🗑 Delete ({selectedIds.size})
+                </button>
+              )}
+              <button
+                onClick={exitSelectMode}
+                className="px-4 py-2 bg-gray-200 text-gray-700 text-sm font-medium rounded hover:bg-gray-300 transition-colors"
+              >
+                ✕ Cancel
+              </button>
+            </>
+          ) : (
             <button
-              onClick={handleBulkDelete}
-              className="px-4 py-2 bg-red-600 text-white text-sm font-medium rounded hover:bg-red-700 transition-colors"
+              onClick={() => setSelectMode(true)}
+              className="px-4 py-2 bg-gray-100 text-gray-700 text-sm font-medium rounded hover:bg-gray-200 transition-colors border border-gray-300"
             >
-              🗑 Delete Selected ({selectedIds.size})
+              ☑ Select Rows
             </button>
           )}
           <button
@@ -495,14 +513,29 @@ function MaterialsTable({
               table.getRowModel().rows.map((row) => (
                 <tr
                   key={row.id}
+                  onClick={
+                    selectMode ? () => toggleRow(row.original.id) : undefined
+                  }
                   className={`transition-colors ${
+                    selectMode ? "cursor-pointer" : ""
+                  } ${
                     selectedIds.has(row.original.id)
                       ? "bg-blue-50 hover:bg-blue-100"
-                      : "hover:bg-gray-50"
+                      : selectMode
+                        ? "hover:bg-gray-100"
+                        : "hover:bg-gray-50"
                   }`}
                 >
                   {row.getVisibleCells().map((cell) => (
-                    <td key={cell.id} className="table-cell">
+                    <td
+                      key={cell.id}
+                      className="table-cell"
+                      onClick={
+                        selectMode && cell.column.id !== "select"
+                          ? (e) => e.stopPropagation()
+                          : undefined
+                      }
+                    >
                       {flexRender(
                         cell.column.columnDef.cell,
                         cell.getContext(),
