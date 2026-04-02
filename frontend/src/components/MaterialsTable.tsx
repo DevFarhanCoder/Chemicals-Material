@@ -226,6 +226,7 @@ function MaterialsTable({
               type="checkbox"
               checked={selectedIds.has(row.original.id)}
               onChange={() => toggleRow(row.original.id)}
+              onClick={(e) => e.stopPropagation()}
               className="w-4 h-4 rounded border-gray-300 cursor-pointer"
             />
           ) : (
@@ -513,8 +514,24 @@ function MaterialsTable({
               table.getRowModel().rows.map((row) => (
                 <tr
                   key={row.id}
-                  onClick={
-                    selectMode ? () => toggleRow(row.original.id) : undefined
+                  // onClickCapture fires top-down BEFORE any child onClick/onChange.
+                  // For non-checkbox clicks we stop propagation (so EditableCells
+                  // don't enter edit mode) and toggle the row ourselves.
+                  // For checkbox clicks we let the event reach the input normally.
+                  onClickCapture={
+                    selectMode
+                      ? (e) => {
+                          const t = e.target as HTMLElement;
+                          if (
+                            t.tagName === "INPUT" &&
+                            (t as HTMLInputElement).type === "checkbox"
+                          ) {
+                            return; // let checkbox onChange handle it
+                          }
+                          e.stopPropagation();
+                          toggleRow(row.original.id);
+                        }
+                      : undefined
                   }
                   className={`transition-colors ${
                     selectMode ? "cursor-pointer" : ""
@@ -527,15 +544,7 @@ function MaterialsTable({
                   }`}
                 >
                   {row.getVisibleCells().map((cell) => (
-                    <td
-                      key={cell.id}
-                      className="table-cell"
-                      onClick={
-                        selectMode && cell.column.id !== "select"
-                          ? (e) => e.stopPropagation()
-                          : undefined
-                      }
-                    >
+                    <td key={cell.id} className="table-cell">
                       {flexRender(
                         cell.column.columnDef.cell,
                         cell.getContext(),
