@@ -86,25 +86,45 @@ function Dashboard() {
   };
 
   // Handle material update — optimistic: update local state immediately,
-  // save to server in the background. No full page re-fetch on success.
+  // save to server in the background. Works for both top-level rows and sub-rows.
   const handleMaterialUpdate = useCallback(
     async (id: string, updates: Partial<Material>) => {
-      // Capture original for rollback
       let original: Material | undefined;
+
       setMaterials((prev) => {
-        original = prev.find((m) => m.id === id);
-        return prev.map((m) => (m.id === id ? { ...m, ...updates } : m));
+        // Try top-level first
+        const top = prev.find((m) => m.id === id);
+        if (top) {
+          original = top;
+          return prev.map((m) => (m.id === id ? { ...m, ...updates } : m));
+        }
+        // Otherwise search sub-rows
+        return prev.map((m) => ({
+          ...m,
+          subRows: m.subRows?.map((s) => {
+            if (s.id === id) {
+              original = s;
+              return { ...s, ...updates };
+            }
+            return s;
+          }),
+        }));
       });
 
       try {
         await api.updateMaterial(id, updates as MaterialUpdate);
         showNotification("Saved", "success");
       } catch {
-        // Revert on failure
         if (original) {
-          setMaterials((prev) =>
-            prev.map((m) => (m.id === id ? original! : m)),
-          );
+          const captured = original;
+          setMaterials((prev) => {
+            if (prev.some((m) => m.id === id))
+              return prev.map((m) => (m.id === id ? captured : m));
+            return prev.map((m) => ({
+              ...m,
+              subRows: m.subRows?.map((s) => (s.id === id ? captured : s)),
+            }));
+          });
         }
         showNotification("Failed to save — change reverted", "error");
       }
@@ -112,19 +132,52 @@ function Dashboard() {
     [showNotification],
   );
 
-  // Handle material delete
+  // Handle material delete — works for both top-level rows and sub-rows
   const handleMaterialDelete = async (id: string) => {
-    if (!window.confirm("Are you sure you want to delete this material?")) {
+    if (!window.confirm("Are you sure you want to delete this material?"))
       return;
-    }
+
+    // Optimistic removal
+    setMaterials((prev) => {
+      if (prev.some((m) => m.id === id)) return prev.filter((m) => m.id !== id);
+      return prev.map((m) => ({
+        ...m,
+        subRows: m.subRows?.filter((s) => s.id !== id),
+      }));
+    });
 
     try {
       await api.deleteMaterial(id);
-      setMaterials((prev) => prev.filter((m) => m.id !== id));
-      showNotification("Material deleted successfully", "success");
+      showNotification("Deleted successfully", "success");
       fetchStats();
-    } catch (error) {
-      showNotification("Failed to delete material", "error");
+    } catch {
+      showNotification("Failed to delete — please refresh", "error");
+      fetchMaterials();
+    }
+  };
+
+  // Handle adding a sub-row to an existing parent material
+  const handleAddSubRow = async (parentId: string) => {
+    const parent = materials.find((m) => m.id === parentId);
+    try {
+      const newSub = await api.createMaterial({
+        caseNo: parent?.caseNo || `SUB-${Date.now()}`,
+        productName: parent?.productName || "Sub Row",
+        companyName: parent?.companyName || "New Company",
+        sourceUrl: "manual-entry",
+        sourceSite: "MANUAL",
+        parentId,
+      });
+      setMaterials((prev) =>
+        prev.map((m) =>
+          m.id === parentId
+            ? { ...m, subRows: [...(m.subRows || []), newSub] }
+            : m,
+        ),
+      );
+      showNotification("Sub row added. Click fields to edit.", "success");
+    } catch {
+      showNotification("Failed to add sub row", "error");
     }
   };
 
@@ -203,6 +256,7 @@ function Dashboard() {
             onDelete={handleMaterialDelete}
             onDeleteMany={handleMaterialDeleteMany}
             onAdd={handleMaterialAdd}
+            onAddSubRow={handleAddSubRow}
             onPageChange={(page: number) =>
               setFilters((prev) => ({ ...prev, page }))
             }

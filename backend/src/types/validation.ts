@@ -37,6 +37,7 @@ export const CreateMaterialSchema = z.object({
     .enum(["PENDING", "CONTACTED", "NOT_INTERESTED", "CONVERTED"])
     .optional(),
   remarks: z.string().optional().nullable(),
+  parentId: z.string().uuid().optional().nullable(),
 });
 
 // Query filters schema

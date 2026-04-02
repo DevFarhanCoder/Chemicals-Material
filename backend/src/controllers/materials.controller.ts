@@ -52,17 +52,21 @@ export const listMaterials = async (
     const skip = (filters.page - 1) * filters.limit;
     const take = filters.limit;
 
+    // Only return top-level rows (parentId IS NULL); sub-rows are nested inside
+    const topLevelWhere = { ...where, parentId: null };
+
     // Execute query
     const [materials, total] = await Promise.all([
       prisma.material.findMany({
-        where,
+        where: topLevelWhere,
+        include: { subRows: { orderBy: { createdAt: "asc" } } },
         skip,
         take,
         orderBy: {
           [filters.sortBy]: filters.sortOrder,
         },
       }),
-      prisma.material.count({ where }),
+      prisma.material.count({ where: topLevelWhere }),
     ]);
 
     res.json({

@@ -23,6 +23,8 @@ export interface Material {
   scrapedAt: string;
   createdAt: string;
   updatedAt: string;
+  parentId: string | null;
+  subRows?: Material[];
 }
 
 export interface MaterialUpdate {

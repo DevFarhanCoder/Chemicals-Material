@@ -145,6 +145,7 @@ interface MaterialsTableProps {
   onDelete: (id: string) => void;
   onDeleteMany: (ids: string[]) => void;
   onAdd: () => void;
+  onAddSubRow: (parentId: string) => void;
   onPageChange: (page: number) => void;
   onSortChange: (sortBy: string, sortOrder: "asc" | "desc") => void;
 }
@@ -157,12 +158,21 @@ function MaterialsTable({
   onDelete,
   onDeleteMany,
   onAdd,
+  onAddSubRow,
   onPageChange,
   onSortChange,
 }: MaterialsTableProps) {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [selectMode, setSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+
+  const toggleExpanded = (id: string) =>
+    setExpandedIds((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
 
   // Clear selection when page data changes or select mode is turned off
   useEffect(() => {
@@ -381,28 +391,65 @@ function MaterialsTable({
       },
       {
         id: "actions",
-        header: "Delete",
-        size: 80,
-        cell: ({ row }) => (
-          <button
-            onClick={() => onDelete(row.original.id)}
-            className="text-red-600 hover:text-red-700 text-sm font-medium px-2 py-1 rounded hover:bg-red-50 transition-colors"
-          >
-            Delete
-          </button>
-        ),
+        header: "Actions",
+        size: 150,
+        cell: ({ row }) => {
+          const hasSubRows = (row.original.subRows?.length ?? 0) > 0;
+          const isExpanded = expandedIds.has(row.original.id);
+          return (
+            <div className="flex items-center gap-1 flex-wrap">
+              <button
+                onClick={() => toggleExpanded(row.original.id)}
+                disabled={!hasSubRows}
+                title={
+                  hasSubRows
+                    ? isExpanded
+                      ? "Collapse sub rows"
+                      : "Expand sub rows"
+                    : "No sub rows"
+                }
+                className={`text-xs px-1.5 py-1 rounded transition-colors border ${
+                  hasSubRows
+                    ? "border-blue-300 text-blue-600 hover:bg-blue-50"
+                    : "border-gray-200 text-gray-300 cursor-default"
+                }`}
+              >
+                {isExpanded ? "▼" : "▶"}
+              </button>
+              <button
+                onClick={() => {
+                  setExpandedIds((prev) => new Set([...prev, row.original.id]));
+                  onAddSubRow(row.original.id);
+                }}
+                title="Add sub row"
+                className="text-xs px-1.5 py-1 rounded border border-indigo-300 text-indigo-600 hover:bg-indigo-50 transition-colors"
+              >
+                + Sub
+              </button>
+              <button
+                onClick={() => onDelete(row.original.id)}
+                className="text-xs font-medium px-1.5 py-1 rounded text-red-600 hover:text-red-700 hover:bg-red-50 transition-colors"
+              >
+                Del
+              </button>
+            </div>
+          );
+        },
       },
     ],
     [
       pageOffset,
       handleCellSave,
       onDelete,
+      onAddSubRow,
       selectMode,
       selectedIds,
       allSelected,
       someSelected,
       toggleAll,
       toggleRow,
+      expandedIds,
+      toggleExpanded,
     ],
   );
 
@@ -522,48 +569,156 @@ function MaterialsTable({
                 </td>
               </tr>
             ) : (
-              table.getRowModel().rows.map((row) => (
-                <tr
-                  key={row.id}
-                  // onClickCapture fires top-down BEFORE any child onClick/onChange.
-                  // For non-checkbox clicks we stop propagation (so EditableCells
-                  // don't enter edit mode) and toggle the row ourselves.
-                  // For checkbox clicks we let the event reach the input normally.
-                  onClickCapture={
-                    selectMode
-                      ? (e) => {
-                          const t = e.target as HTMLElement;
-                          if (
-                            t.tagName === "INPUT" &&
-                            (t as HTMLInputElement).type === "checkbox"
-                          ) {
-                            return; // let checkbox onChange handle it
+              table.getRowModel().rows.flatMap((row) => {
+                const parentTr = (
+                  <tr
+                    key={row.id}
+                    onClickCapture={
+                      selectMode
+                        ? (e) => {
+                            const t = e.target as HTMLElement;
+                            if (
+                              t.tagName === "INPUT" &&
+                              (t as HTMLInputElement).type === "checkbox"
+                            ) {
+                              return;
+                            }
+                            e.stopPropagation();
+                            toggleRow(row.original.id);
                           }
-                          e.stopPropagation();
-                          toggleRow(row.original.id);
-                        }
-                      : undefined
-                  }
-                  className={`transition-colors ${
-                    selectMode ? "cursor-pointer" : ""
-                  } ${
-                    selectedIds.has(row.original.id)
-                      ? "bg-blue-50 hover:bg-blue-100"
-                      : selectMode
-                        ? "hover:bg-gray-100"
-                        : "hover:bg-gray-50"
-                  }`}
-                >
-                  {row.getVisibleCells().map((cell) => (
-                    <td key={cell.id} className="table-cell">
-                      {flexRender(
-                        cell.column.columnDef.cell,
-                        cell.getContext(),
-                      )}
+                        : undefined
+                    }
+                    className={`transition-colors ${
+                      selectMode ? "cursor-pointer" : ""
+                    } ${
+                      selectedIds.has(row.original.id)
+                        ? "bg-blue-50 hover:bg-blue-100"
+                        : selectMode
+                          ? "hover:bg-gray-100"
+                          : "hover:bg-gray-50"
+                    }`}
+                  >
+                    {row.getVisibleCells().map((cell) => (
+                      <td key={cell.id} className="table-cell">
+                        {flexRender(
+                          cell.column.columnDef.cell,
+                          cell.getContext(),
+                        )}
+                      </td>
+                    ))}
+                  </tr>
+                );
+
+                const isExpanded = expandedIds.has(row.original.id);
+                const subRows = row.original.subRows ?? [];
+                if (!isExpanded || subRows.length === 0) return [parentTr];
+
+                const subTrs = subRows.map((sub) => (
+                  <tr
+                    key={`sub-${sub.id}`}
+                    className="bg-indigo-50/40 border-l-4 border-indigo-300"
+                  >
+                    {/* # / indent column */}
+                    <td className="table-cell text-center text-gray-400 text-sm select-none">
+                      ↳
                     </td>
-                  ))}
-                </tr>
-              ))
+                    <td className="table-cell">
+                      <EditableCell
+                        value={sub.caseNo}
+                        rowId={sub.id}
+                        field="caseNo"
+                        onSave={handleCellSave}
+                      />
+                    </td>
+                    <td className="table-cell">
+                      <EditableCell
+                        value={sub.productName}
+                        rowId={sub.id}
+                        field="productName"
+                        type="textarea"
+                        onSave={handleCellSave}
+                      />
+                    </td>
+                    <td className="table-cell">
+                      <EditableCell
+                        value={sub.price}
+                        rowId={sub.id}
+                        field="price"
+                        onSave={handleCellSave}
+                      />
+                    </td>
+                    <td className="table-cell">
+                      <EditableCell
+                        value={sub.unit}
+                        rowId={sub.id}
+                        field="unit"
+                        onSave={handleCellSave}
+                      />
+                    </td>
+                    <td className="table-cell">
+                      <EditableCell
+                        value={sub.email}
+                        rowId={sub.id}
+                        field="email"
+                        onSave={handleCellSave}
+                      />
+                    </td>
+                    <td className="table-cell">
+                      <EditableCell
+                        value={sub.mobile}
+                        rowId={sub.id}
+                        field="mobile"
+                        onSave={handleCellSave}
+                      />
+                    </td>
+                    <td className="table-cell">
+                      <EditableCell
+                        value={sub.companyName}
+                        rowId={sub.id}
+                        field="companyName"
+                        onSave={handleCellSave}
+                      />
+                    </td>
+                    <td className="table-cell">
+                      <EditableCell
+                        value={sub.location}
+                        rowId={sub.id}
+                        field="location"
+                        onSave={handleCellSave}
+                      />
+                    </td>
+                    <td className="table-cell">
+                      <EditableCell
+                        value={sub.lastContacted}
+                        rowId={sub.id}
+                        field="lastContacted"
+                        type="date"
+                        onSave={handleCellSave}
+                      />
+                    </td>
+                    <td className="table-cell">
+                      <EditableCell
+                        value={sub.remarks}
+                        rowId={sub.id}
+                        field="remarks"
+                        type="textarea"
+                        onSave={handleCellSave}
+                      />
+                    </td>
+                    {/* actions — sub-rows only get Delete */}
+                    <td className="table-cell">
+                      <button
+                        onClick={() => onDelete(sub.id)}
+                        className="text-xs font-medium px-2 py-1 rounded text-red-600 hover:text-red-700 hover:bg-red-50 transition-colors"
+                      >
+                        Delete
+                      </button>
+                    </td>
+                  </tr>
+                ));
+
+                return [parentTr, ...subTrs];
+              })
             )}
           </tbody>
         </table>
