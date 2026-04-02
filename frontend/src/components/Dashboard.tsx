@@ -120,13 +120,32 @@ function Dashboard() {
 
     try {
       await api.deleteMaterial(id);
+      setMaterials((prev) => prev.filter((m) => m.id !== id));
       showNotification("Material deleted successfully", "success");
-      fetchMaterials();
       fetchStats();
     } catch (error) {
       showNotification("Failed to delete material", "error");
     }
   };
+
+  // Handle bulk delete — deletes all selected IDs in parallel, optimistically
+  const handleMaterialDeleteMany = useCallback(
+    async (ids: string[]) => {
+      // Optimistically remove from UI immediately
+      setMaterials((prev) => prev.filter((m) => !ids.includes(m.id)));
+
+      try {
+        await Promise.all(ids.map((id) => api.deleteMaterial(id)));
+        showNotification(`${ids.length} row(s) deleted`, "success");
+        fetchStats();
+        fetchMaterials(); // refresh count / pagination
+      } catch {
+        showNotification("Some deletions failed — please refresh", "error");
+        fetchMaterials();
+      }
+    },
+    [showNotification],
+  );
 
   // Handle material add
   const handleMaterialAdd = async () => {
@@ -182,6 +201,7 @@ function Dashboard() {
             isLoading={isLoading}
             onUpdate={handleMaterialUpdate}
             onDelete={handleMaterialDelete}
+            onDeleteMany={handleMaterialDeleteMany}
             onAdd={handleMaterialAdd}
             onPageChange={(page: number) =>
               setFilters((prev) => ({ ...prev, page }))

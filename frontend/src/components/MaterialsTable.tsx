@@ -132,6 +132,7 @@ interface MaterialsTableProps {
   isLoading: boolean;
   onUpdate: (id: string, updates: Partial<Material>) => void;
   onDelete: (id: string) => void;
+  onDeleteMany: (ids: string[]) => void;
   onAdd: () => void;
   onPageChange: (page: number) => void;
   onSortChange: (sortBy: string, sortOrder: "asc" | "desc") => void;
@@ -143,11 +144,46 @@ function MaterialsTable({
   isLoading,
   onUpdate,
   onDelete,
+  onDeleteMany,
   onAdd,
   onPageChange,
   onSortChange,
 }: MaterialsTableProps) {
   const [sorting, setSorting] = useState<SortingState>([]);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+  // Clear selection whenever the page data changes
+  useEffect(() => {
+    setSelectedIds(new Set());
+  }, [materials]);
+
+  const allPageIds = materials.map((m) => m.id);
+  const allSelected =
+    allPageIds.length > 0 && allPageIds.every((id) => selectedIds.has(id));
+  const someSelected = selectedIds.size > 0;
+
+  const toggleAll = () => {
+    if (allSelected) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(allPageIds));
+    }
+  };
+
+  const toggleRow = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
+
+  const handleBulkDelete = () => {
+    const ids = Array.from(selectedIds);
+    if (!window.confirm(`Delete ${ids.length} selected row(s)?`)) return;
+    onDeleteMany(ids);
+    setSelectedIds(new Set());
+  };
 
   // Single stable save handler — EditableCells get a consistent function ref
   // so React.memo keeps them from re-rendering unnecessarily.
@@ -164,6 +200,30 @@ function MaterialsTable({
   // remounts cells while someone is typing.
   const columns = useMemo<ColumnDef<Material>[]>(
     () => [
+      {
+        id: "select",
+        size: 44,
+        header: () => (
+          <input
+            type="checkbox"
+            checked={allSelected}
+            ref={(el) => {
+              if (el) el.indeterminate = someSelected && !allSelected;
+            }}
+            onChange={toggleAll}
+            className="w-4 h-4 rounded border-gray-300 text-primary-600 cursor-pointer"
+            title={allSelected ? "Deselect all" : "Select all on this page"}
+          />
+        ),
+        cell: ({ row }) => (
+          <input
+            type="checkbox"
+            checked={selectedIds.has(row.original.id)}
+            onChange={() => toggleRow(row.original.id)}
+            className="w-4 h-4 rounded border-gray-300 text-primary-600 cursor-pointer"
+          />
+        ),
+      },
       {
         id: "srNo",
         header: "Sr. No.",
@@ -321,7 +381,16 @@ function MaterialsTable({
         ),
       },
     ],
-    [pageOffset, handleCellSave, onDelete],
+    [
+      pageOffset,
+      handleCellSave,
+      onDelete,
+      selectedIds,
+      allSelected,
+      someSelected,
+      toggleAll,
+      toggleRow,
+    ],
   );
 
   const table = useReactTable({
@@ -354,16 +423,33 @@ function MaterialsTable({
   return (
     <div className="card overflow-hidden">
       {/* Toolbar */}
-      <div className="px-6 py-3 bg-gray-50 border-b border-gray-200 flex justify-between items-center">
-        <h3 className="text-sm font-medium text-gray-700">
-          {pagination.total} Materials
-        </h3>
-        <button
-          onClick={onAdd}
-          className="px-4 py-2 bg-primary-600 text-white text-sm font-medium rounded hover:bg-primary-700 transition-colors"
-        >
-          + Add New Row
-        </button>
+      <div className="px-6 py-3 bg-gray-50 border-b border-gray-200 flex justify-between items-center gap-3 flex-wrap">
+        <div className="flex items-center gap-3">
+          <h3 className="text-sm font-medium text-gray-700">
+            {pagination.total} Materials
+          </h3>
+          {someSelected && (
+            <span className="text-sm text-blue-700 font-medium">
+              {selectedIds.size} selected
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          {someSelected && (
+            <button
+              onClick={handleBulkDelete}
+              className="px-4 py-2 bg-red-600 text-white text-sm font-medium rounded hover:bg-red-700 transition-colors"
+            >
+              🗑 Delete Selected ({selectedIds.size})
+            </button>
+          )}
+          <button
+            onClick={onAdd}
+            className="px-4 py-2 bg-primary-600 text-white text-sm font-medium rounded hover:bg-primary-700 transition-colors"
+          >
+            + Add New Row
+          </button>
+        </div>
       </div>
 
       {/* Table */}
@@ -407,7 +493,14 @@ function MaterialsTable({
               </tr>
             ) : (
               table.getRowModel().rows.map((row) => (
-                <tr key={row.id} className="hover:bg-gray-50 transition-colors">
+                <tr
+                  key={row.id}
+                  className={`transition-colors ${
+                    selectedIds.has(row.original.id)
+                      ? "bg-blue-50 hover:bg-blue-100"
+                      : "hover:bg-gray-50"
+                  }`}
+                >
                   {row.getVisibleCells().map((cell) => (
                     <td key={cell.id} className="table-cell">
                       {flexRender(
