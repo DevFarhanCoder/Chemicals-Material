@@ -150,26 +150,6 @@ function Dashboard() {
     }
   };
 
-  // Handle scraping trigger
-  const handleTriggerScraping = async () => {
-    try {
-      await api.triggerScraping();
-      showNotification(
-        "Scraping started. This may take a few minutes.",
-        "info",
-      );
-    } catch (error) {
-      showNotification("Failed to trigger scraping", "error");
-    }
-  };
-
-  // Handle refresh
-  const handleRefresh = () => {
-    fetchMaterials();
-    fetchStats();
-    showNotification("Data refreshed", "success");
-  };
-
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
