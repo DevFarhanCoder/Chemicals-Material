@@ -161,7 +161,7 @@ function Dashboard() {
     const parent = materials.find((m) => m.id === parentId);
     try {
       const newSub = await api.createMaterial({
-        caseNo: parent?.caseNo || `SUB-${Date.now()}`,
+        caseNo: `${parent?.caseNo || "SUB"}-${Date.now()}`,
         productName: parent?.productName || "Sub Row",
         companyName: parent?.companyName || "New Company",
         sourceUrl: "manual-entry",
