@@ -56,26 +56,8 @@ async function saveMaterials(
       });
       success++;
     } catch (error: any) {
-      // If duplicate case number, try to upsert
-      if (error.code === "P2002") {
-        try {
-          await prisma.material.update({
-            where: { caseNo: generateCaseNo(material.sourceSite, index) },
-            data: {
-              productName: material.productName,
-              price: material.price,
-              scrapedAt: new Date(),
-            },
-          });
-          success++;
-        } catch (updateError) {
-          logger.error("Failed to update material:", updateError);
-          failed++;
-        }
-      } else {
-        logger.error("Failed to save material:", error);
-        failed++;
-      }
+      logger.error("Failed to save material:", error);
+      failed++;
     }
   }
 
