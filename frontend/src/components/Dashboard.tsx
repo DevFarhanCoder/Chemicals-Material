@@ -116,9 +116,9 @@ function Dashboard() {
   // Handle material add
   const handleMaterialAdd = async () => {
     try {
-      // Create a new material with default values
+      // Create a new material with default values (unique caseNo using timestamp)
       await api.createMaterial({
-        caseNo: "000-00-0",
+        caseNo: `MANUAL-${Date.now()}`,
         productName: "New Product",
         companyName: "New Company",
         sourceUrl: "manual-entry",

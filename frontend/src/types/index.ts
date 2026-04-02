@@ -25,9 +25,16 @@ export interface Material {
 }
 
 export interface MaterialUpdate {
+  caseNo?: string;
+  productName?: string;
+  email?: string | null;
+  mobile?: string | null;
+  companyName?: string;
+  location?: string | null;
+  price?: string | null;
   status?: MaterialStatus;
-  remarks?: string;
-  lastContacted?: string;
+  remarks?: string | null;
+  lastContacted?: string | null;
 }
 
 export interface MaterialFilters {

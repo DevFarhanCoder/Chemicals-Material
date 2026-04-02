@@ -3,7 +3,7 @@ import { z } from "zod";
 // Material validation schema
 export const MaterialSchema = z.object({
   productName: z.string().min(1).max(500),
-  email: z.string().email().optional().nullable(),
+  email: z.string().max(255).optional().nullable(),
   mobile: z.string().max(50).optional().nullable(),
   companyName: z.string().min(1).max(255),
   location: z.string().max(255).optional().nullable(),
@@ -25,7 +25,7 @@ export const CreateMaterialSchema = z.object({
   companyName: z.string().min(1).max(255),
   sourceUrl: z.string().min(1),
   sourceSite: z.string().min(1).max(100),
-  email: z.string().email().optional().nullable(),
+  email: z.string().max(255).optional().nullable(),
   mobile: z.string().max(50).optional().nullable(),
   location: z.string().max(255).optional().nullable(),
   price: z.string().max(100).optional().nullable(),
