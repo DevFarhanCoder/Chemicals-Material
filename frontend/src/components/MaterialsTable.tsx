@@ -135,6 +135,115 @@ const EditableCell = React.memo(function EditableCell({
 });
 
 // =============================================================================
+// Currency conversion
+// =============================================================================
+const EXCHANGE_RATES: Record<
+  string,
+  { symbol: string; rate: number; label: string }
+> = {
+  INR: { symbol: "₹",  rate: 1,        label: "INR – Indian Rupee" },
+  USD: { symbol: "$",  rate: 0.012,    label: "USD – US Dollar" },
+  EUR: { symbol: "€",  rate: 0.011,    label: "EUR – Euro" },
+  JPY: { symbol: "¥",  rate: 1.80,     label: "JPY – Japanese Yen" },
+  GBP: { symbol: "£",  rate: 0.0095,   label: "GBP – British Pound" },
+  AED: { symbol: "د.إ", rate: 0.044,   label: "AED – UAE Dirham" },
+  CNY: { symbol: "¥",  rate: 0.087,    label: "CNY – Chinese Yuan" },
+  SGD: { symbol: "S$", rate: 0.016,    label: "SGD – Singapore Dollar" },
+  CAD: { symbol: "C$", rate: 0.016,    label: "CAD – Canadian Dollar" },
+  AUD: { symbol: "A$", rate: 0.019,    label: "AUD – Australian Dollar" },
+};
+
+/** Convert a stored INR string to the selected currency for display. */
+function convertPrice(
+  raw: string | null,
+  currency: string,
+): string | null {
+  if (!raw) return null;
+  // Extract the first number-like sequence from the string
+  const match = raw.match(/[\d.,]+/);
+  if (!match) return raw; // non-numeric string — return as-is
+  const num = parseFloat(match[0].replace(/,/g, ""));
+  if (isNaN(num)) return raw;
+  const { symbol, rate } = EXCHANGE_RATES[currency] || EXCHANGE_RATES.INR;
+  const converted = num * rate;
+  // Format: no decimals for large values, 2 decimals otherwise
+  const formatted =
+    converted >= 100
+      ? converted.toLocaleString("en-IN", { maximumFractionDigits: 0 })
+      : converted.toLocaleString("en-IN", { maximumFractionDigits: 2 });
+  return `${symbol}${formatted}`;
+}
+
+interface PriceCellProps {
+  value: string | null;
+  rowId: string;
+  currency: string;
+  onSave: (rowId: string, field: string, value: string | null) => void;
+}
+
+/** Price cell: edits raw INR value, displays in selected currency. */
+const PriceCell = React.memo(function PriceCell({
+  value,
+  rowId,
+  currency,
+  onSave,
+}: PriceCellProps) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [localValue, setLocalValue] = useState<string>(value ?? "");
+
+  useEffect(() => {
+    if (!isEditing) setLocalValue(value ?? "");
+  }, [value, isEditing]);
+
+  const commit = () => {
+    setIsEditing(false);
+    const trimmed = localValue.trimEnd();
+    if (trimmed !== (value ?? "")) onSave(rowId, "price", trimmed || null);
+  };
+
+  const cancel = () => {
+    setIsEditing(false);
+    setLocalValue(value ?? "");
+  };
+
+  if (isEditing) {
+    return (
+      <input
+        autoFocus
+        value={localValue}
+        onChange={(e) => setLocalValue(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") e.currentTarget.blur();
+          if (e.key === "Escape") cancel();
+        }}
+        placeholder="Enter in INR"
+        className="text-sm border border-blue-400 rounded px-2 py-1 w-full outline-none focus:ring-2 focus:ring-blue-200"
+      />
+    );
+  }
+
+  const display =
+    currency === "INR"
+      ? value
+        ? `₹${value}`
+        : null
+      : convertPrice(value, currency);
+
+  return (
+    <div
+      onClick={() => setIsEditing(true)}
+      title={currency !== "INR" && value ? `INR: ₹${value}` : "Click to edit"}
+      className="text-sm cursor-pointer hover:bg-blue-50 p-1 rounded min-h-[24px]"
+    >
+      {display || (
+        <span className="text-gray-400 italic text-xs">Click to edit</span>
+      )}
+    </div>
+  );
+});
+
+// =============================================================================
 // MaterialsTable
 // =============================================================================
 interface MaterialsTableProps {
@@ -166,6 +275,7 @@ function MaterialsTable({
   const [selectMode, setSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+  const [selectedCurrency, setSelectedCurrency] = useState<string>("INR");
 
   const toggleExpanded = (id: string) =>
     setExpandedIds((prev) => {
@@ -285,13 +395,20 @@ function MaterialsTable({
       },
       {
         accessorKey: "price",
-        header: "Price",
-        size: 100,
+        header: () => (
+          <div className="flex items-center gap-1">
+            <span>Price</span>
+            <span className="text-gray-400 font-normal normal-case">
+              ({EXCHANGE_RATES[selectedCurrency]?.symbol ?? "₹"})
+            </span>
+          </div>
+        ),
+        size: 120,
         cell: ({ row }) => (
-          <EditableCell
+          <PriceCell
             value={row.original.price}
             rowId={row.original.id}
-            field="price"
+            currency={selectedCurrency}
             onSave={handleCellSave}
           />
         ),
@@ -450,6 +567,7 @@ function MaterialsTable({
       toggleRow,
       expandedIds,
       toggleExpanded,
+      selectedCurrency,
     ],
   );
 
@@ -493,6 +611,23 @@ function MaterialsTable({
               {selectedIds.size} selected
             </span>
           )}
+          {/* Currency selector */}
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs text-gray-500 whitespace-nowrap">
+              Currency:
+            </span>
+            <select
+              value={selectedCurrency}
+              onChange={(e) => setSelectedCurrency(e.target.value)}
+              className="text-xs border border-gray-300 rounded px-2 py-1.5 bg-white text-gray-700 font-medium cursor-pointer hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-300"
+            >
+              {Object.entries(EXCHANGE_RATES).map(([code, { label }]) => (
+                <option key={code} value={code}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
         <div className="flex items-center gap-2">
           {selectMode ? (
@@ -640,10 +775,10 @@ function MaterialsTable({
                       />
                     </td>
                     <td className="table-cell">
-                      <EditableCell
+                      <PriceCell
                         value={sub.price}
                         rowId={sub.id}
-                        field="price"
+                        currency={selectedCurrency}
                         onSave={handleCellSave}
                       />
                     </td>
