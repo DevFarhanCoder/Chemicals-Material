@@ -3,7 +3,7 @@ import cors from "cors";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
 import dotenv from "dotenv";
-import { PrismaClient } from "@prisma/client";
+import mongoose from "mongoose";
 
 // Import routes
 import materialsRouter from "./routes/materials";
@@ -15,9 +15,6 @@ import logger from "./config/logger";
 
 // Load environment variables
 dotenv.config();
-
-// Initialize Prisma Client
-export const prisma = new PrismaClient();
 
 // Create Express app
 const app: Express = express();
@@ -135,9 +132,11 @@ app.use(
 
 const startServer = async () => {
   try {
-    // Test database connection
-    await prisma.$connect();
-    logger.info("Database connected successfully");
+    const mongoUri = process.env.MONGODB_URI;
+    if (!mongoUri) throw new Error("MONGODB_URI environment variable is not set");
+
+    await mongoose.connect(mongoUri);
+    logger.info("MongoDB connected successfully");
 
     // Start server
     app.listen(PORT, () => {
@@ -154,13 +153,13 @@ const startServer = async () => {
 // Handle graceful shutdown
 process.on("SIGINT", async () => {
   logger.info("Shutting down gracefully...");
-  await prisma.$disconnect();
+  await mongoose.disconnect();
   process.exit(0);
 });
 
 process.on("SIGTERM", async () => {
   logger.info("SIGTERM received, shutting down...");
-  await prisma.$disconnect();
+  await mongoose.disconnect();
   process.exit(0);
 });
 

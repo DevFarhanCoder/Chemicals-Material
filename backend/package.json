@@ -5,18 +5,8 @@
   "main": "dist/server.js",
   "scripts": {
     "dev": "nodemon --exec ts-node src/server.ts",
-    "build": "tsc && npx prisma migrate deploy",
+    "build": "tsc",
     "start": "node dist/server.js",
-    "prisma:generate": "prisma generate",
-    "prisma:migrate": "prisma migrate dev",
-    "prisma:studio": "prisma studio",
-    "clear:materials": "ts-node src/scripts/clear-materials.ts",
-    "scrape": "ts-node src/scrapers/run-all.ts",
-    "scrape:combi": "ts-node src/scrapers/run-scraper.ts combi-blocks",
-    "scrape:chemsworth": "ts-node src/scrapers/run-scraper.ts chemsworth",
-    "scrape:ottokemi": "ts-node src/scrapers/run-scraper.ts ottokemi",
-    "scrape:chemscene": "ts-node src/scrapers/run-scraper.ts chemscene",
-    "scrape:sigma": "ts-node src/scrapers/run-scraper.ts sigmaaldrich",
     "lint": "eslint src --ext .ts",
     "lint:fix": "eslint src --ext .ts --fix"
   },
@@ -30,7 +20,6 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
-    "@prisma/client": "^5.8.0",
     "@types/cors": "^2.8.17",
     "@types/express": "^4.17.21",
     "@types/node": "^20.10.6",
@@ -39,18 +28,19 @@
     "express": "^4.18.2",
     "express-rate-limit": "^7.1.5",
     "helmet": "^7.1.0",
+    "mongoose": "^9.4.1",
     "puppeteer": "^21.7.0",
     "typescript": "^5.3.3",
+    "uuid": "^13.0.0",
     "winston": "^3.11.0",
     "zod": "^3.22.4"
   },
   "devDependencies": {
-    "@types/dotenv": "^6.1.1",
+    "@types/uuid": "^10.0.0",
     "@typescript-eslint/eslint-plugin": "^6.17.0",
     "@typescript-eslint/parser": "^6.17.0",
     "eslint": "^8.56.0",
     "nodemon": "^3.0.2",
-    "prisma": "^5.8.0",
     "ts-node": "^10.9.2"
   },
   "engines": {

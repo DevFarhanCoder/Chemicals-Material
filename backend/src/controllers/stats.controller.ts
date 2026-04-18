@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from "express";
-import { prisma } from "../server";
+import { Material } from "../models/Material";
 
 /**
  * GET /api/stats
@@ -11,37 +11,26 @@ export const getStats = async (
   next: NextFunction,
 ) => {
   try {
-    // Get total counts
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+
     const [total, byStatus, byCompany, recentlyAdded] = await Promise.all([
-      // Total materials
-      prisma.material.count(),
+      Material.countDocuments(),
 
-      // Count by status
-      prisma.material.groupBy({
-        by: ["status"],
-        _count: true,
-      }),
+      Material.aggregate([
+        { $group: { _id: "$status", count: { $sum: 1 } } },
+      ]),
 
-      // Count by company (top 10)
-      prisma.$queryRaw`
-        SELECT company_name, COUNT(*)::integer as count
-        FROM materials
-        GROUP BY company_name
-        ORDER BY count DESC
-        LIMIT 10
-      `,
+      Material.aggregate([
+        { $match: { companyName: { $ne: null } } },
+        { $group: { _id: "$companyName", count: { $sum: 1 } } },
+        { $sort: { count: -1 } },
+        { $limit: 10 },
+        { $project: { company_name: "$_id", count: 1, _id: 0 } },
+      ]),
 
-      // Recently added (last 7 days)
-      prisma.material.count({
-        where: {
-          createdAt: {
-            gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
-          },
-        },
-      }),
+      Material.countDocuments({ createdAt: { $gte: sevenDaysAgo } }),
     ]);
 
-    // Transform status counts
     const statusStats = {
       PENDING: 0,
       CONTACTED: 0,
@@ -50,7 +39,9 @@ export const getStats = async (
     };
 
     byStatus.forEach((item: any) => {
-      statusStats[item.status as keyof typeof statusStats] = item._count;
+      if (item._id in statusStats) {
+        statusStats[item._id as keyof typeof statusStats] = item.count;
+      }
     });
 
     res.json({

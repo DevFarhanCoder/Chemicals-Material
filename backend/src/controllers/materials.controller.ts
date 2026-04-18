@@ -1,5 +1,7 @@
 import { Request, Response, NextFunction } from "express";
-import { prisma } from "../server";
+import { randomUUID } from "crypto";
+import { Material } from "../models/Material";
+import { AdminAction } from "../models/AdminAction";
 import {
   MaterialFiltersSchema,
   UpdateMaterialSchema,
@@ -17,57 +19,65 @@ export const listMaterials = async (
   next: NextFunction,
 ) => {
   try {
-    // Validate query parameters
     const filters = MaterialFiltersSchema.parse(req.query);
 
-    // Build where clause
-    const where: any = {};
+    const query: any = { parentId: null };
 
     if (filters.search) {
-      where.OR = [
-        { productName: { contains: filters.search, mode: "insensitive" } },
-        { caseNo: { contains: filters.search, mode: "insensitive" } },
-        { email: { contains: filters.search, mode: "insensitive" } },
-        { mobile: { contains: filters.search, mode: "insensitive" } },
-        { companyName: { contains: filters.search, mode: "insensitive" } },
-        { location: { contains: filters.search, mode: "insensitive" } },
-        { price: { contains: filters.search, mode: "insensitive" } },
-        { remarks: { contains: filters.search, mode: "insensitive" } },
+      const re = new RegExp(filters.search.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
+      query.$or = [
+        { productName: re },
+        { caseNo: re },
+        { email: re },
+        { mobile: re },
+        { companyName: re },
+        { location: re },
+        { price: re },
+        { remarks: re },
       ];
     }
 
     if (filters.company) {
-      where.companyName = { contains: filters.company, mode: "insensitive" };
+      query.companyName = new RegExp(filters.company.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
     }
 
     if (filters.location) {
-      where.location = { contains: filters.location, mode: "insensitive" };
+      query.location = new RegExp(filters.location.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
     }
 
     if (filters.status) {
-      where.status = filters.status;
+      query.status = filters.status;
     }
 
-    // Calculate pagination
     const skip = (filters.page - 1) * filters.limit;
-    const take = filters.limit;
+    const sortDir = filters.sortOrder === "asc" ? 1 : -1;
 
-    // Only return top-level rows (parentId IS NULL); sub-rows are nested inside
-    const topLevelWhere = { ...where, parentId: null };
-
-    // Execute query
-    const [materials, total] = await Promise.all([
-      prisma.material.findMany({
-        where: topLevelWhere,
-        include: { subRows: { orderBy: { createdAt: "asc" } } },
-        skip,
-        take,
-        orderBy: {
-          [filters.sortBy]: filters.sortOrder,
-        },
-      }),
-      prisma.material.count({ where: topLevelWhere }),
+    const [topRows, total] = await Promise.all([
+      Material.find(query)
+        .sort({ [filters.sortBy]: sortDir })
+        .skip(skip)
+        .limit(filters.limit)
+        .lean(),
+      Material.countDocuments(query),
     ]);
+
+    const topIds = topRows.map((r: any) => r._id);
+    const allSubRows = await Material.find({ parentId: { $in: topIds } })
+      .sort({ createdAt: 1 })
+      .lean();
+
+    const subRowMap: Record<string, any[]> = {};
+    for (const sub of allSubRows) {
+      const pid = (sub as any).parentId;
+      if (!subRowMap[pid]) subRowMap[pid] = [];
+      subRowMap[pid].push({ ...(sub as any), id: (sub as any)._id });
+    }
+
+    const materials = topRows.map((r: any) => ({
+      ...r,
+      id: r._id,
+      subRows: subRowMap[r._id] || [],
+    }));
 
     res.json({
       data: materials,
@@ -95,15 +105,13 @@ export const getMaterial = async (
   try {
     const { id } = req.params;
 
-    const material = await prisma.material.findUnique({
-      where: { id },
-    });
+    const material = await Material.findById(id).lean();
 
     if (!material) {
       return res.status(404).json({ error: "Material not found" });
     }
 
-    res.json(material);
+    res.json({ ...(material as any), id: (material as any)._id });
   } catch (error) {
     return next(error);
   }
@@ -119,21 +127,18 @@ export const createMaterial = async (
   next: NextFunction,
 ) => {
   try {
-    // Validate create data
     const createData = CreateMaterialSchema.parse(req.body);
 
-    // Create material with default status
-    const newMaterial = await prisma.material.create({
-      data: {
-        ...createData,
-        status: createData.status || "PENDING",
-        scrapedAt: new Date(),
-      },
+    const newMaterial = await Material.create({
+      _id: randomUUID(),
+      ...createData,
+      status: createData.status || "PENDING",
+      scrapedAt: new Date(),
     });
 
-    logger.info(`Material ${newMaterial.id} created manually`);
+    logger.info(`Material ${newMaterial._id} created manually`);
 
-    res.status(201).json(newMaterial);
+    res.status(201).json({ ...newMaterial.toJSON(), id: newMaterial._id });
   } catch (error) {
     return next(error);
   }
@@ -150,62 +155,55 @@ export const updateMaterial = async (
 ) => {
   try {
     const { id } = req.params;
-
-    // Validate update data
     const updateData = UpdateMaterialSchema.parse(req.body);
 
-    // Check if material exists
-    const existingMaterial = await prisma.material.findUnique({
-      where: { id },
-    });
-
+    const existingMaterial = await Material.findById(id);
     if (!existingMaterial) {
       return res.status(404).json({ error: "Material not found" });
     }
 
-    // Log admin action if status changed
+    const adminActions: Promise<any>[] = [];
+
     if (updateData.status && updateData.status !== existingMaterial.status) {
-      await prisma.adminAction.create({
-        data: {
+      adminActions.push(
+        AdminAction.create({
           materialId: id,
           action: "status_change",
           oldValue: existingMaterial.status,
           newValue: updateData.status,
-        },
-      });
+        }),
+      );
     }
 
-    // Log admin action if remarks changed
     if (updateData.remarks && updateData.remarks !== existingMaterial.remarks) {
-      await prisma.adminAction.create({
-        data: {
+      adminActions.push(
+        AdminAction.create({
           materialId: id,
           action: "remark_added",
           oldValue: existingMaterial.remarks || "",
           newValue: updateData.remarks,
-        },
-      });
+        }),
+      );
     }
 
-    // Update material
-    const updatedMaterial = await prisma.material.update({
-      where: { id },
-      data: {
-        ...updateData,
-        // Explicitly handle lastContacted so null correctly clears the field
-        ...(updateData.lastContacted !== undefined
-          ? {
-              lastContacted: updateData.lastContacted
-                ? new Date(updateData.lastContacted)
-                : null,
-            }
-          : {}),
-      },
-    });
+    await Promise.all(adminActions);
+
+    const updatePayload: any = { ...updateData };
+    if (updateData.lastContacted !== undefined) {
+      updatePayload.lastContacted = updateData.lastContacted
+        ? new Date(updateData.lastContacted)
+        : null;
+    }
+
+    const updatedMaterial = await Material.findByIdAndUpdate(
+      id,
+      { $set: updatePayload },
+      { new: true, lean: true },
+    );
 
     logger.info(`Material ${id} updated`, { changes: updateData });
 
-    res.json(updatedMaterial);
+    res.json({ ...(updatedMaterial as any), id });
   } catch (error) {
     return next(error);
   }
@@ -223,19 +221,14 @@ export const deleteMaterial = async (
   try {
     const { id } = req.params;
 
-    // Check if material exists
-    const material = await prisma.material.findUnique({
-      where: { id },
-    });
-
+    const material = await Material.findById(id);
     if (!material) {
       return res.status(404).json({ error: "Material not found" });
     }
 
-    // Delete material
-    await prisma.material.delete({
-      where: { id },
-    });
+    // Delete sub-rows first, then parent (cascade)
+    await Material.deleteMany({ parentId: id });
+    await Material.findByIdAndDelete(id);
 
     logger.info(`Material ${id} deleted`);
 
@@ -257,26 +250,15 @@ export const getDistinctValues = async (
   try {
     const { field } = req.params;
 
-    // Validate field and map to database column names
-    const fieldMapping: Record<string, string> = {
-      companyName: "company_name",
-      location: "location",
-      status: "status",
-      sourceSite: "source_site",
-    };
-
-    if (!fieldMapping[field]) {
+    const allowedFields = ["companyName", "location", "status", "sourceSite"];
+    if (!allowedFields.includes(field)) {
       return res.status(400).json({ error: "Invalid field" });
     }
 
-    const dbColumnName = fieldMapping[field];
+    const values = await Material.distinct(field, { [field]: { $ne: null } });
+    values.sort();
 
-    // Get distinct values - use raw query for flexibility
-    const result = await prisma.$queryRawUnsafe(
-      `SELECT DISTINCT "${dbColumnName}" as value FROM materials WHERE "${dbColumnName}" IS NOT NULL ORDER BY "${dbColumnName}"`,
-    );
-
-    res.json(result);
+    res.json(values.map((v) => ({ value: v })));
   } catch (error) {
     return next(error);
   }
