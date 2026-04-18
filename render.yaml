@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: chemicals-material-backend
+    runtime: node
+    rootDir: backend
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: MONGODB_URI
+        sync: false
+      - key: FRONTEND_URL
+        value: https://chemicals-material.vercel.app
+      - key: CORS_ORIGIN
+        value: https://chemicals-material.vercel.app
