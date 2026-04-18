@@ -133,10 +133,15 @@ app.use(
 const startServer = async () => {
   try {
     const mongoUri = process.env.MONGODB_URI;
-    if (!mongoUri) throw new Error("MONGODB_URI environment variable is not set");
+    if (!mongoUri) {
+      console.error("FATAL: MONGODB_URI environment variable is not set");
+      process.exit(1);
+    }
 
-    await mongoose.connect(mongoUri);
+    console.log("Connecting to MongoDB...");
+    await mongoose.connect(mongoUri, { serverSelectionTimeoutMS: 10000 });
     logger.info("MongoDB connected successfully");
+    console.log("MongoDB connected successfully");
 
     // Start server
     app.listen(PORT, () => {
@@ -145,6 +150,7 @@ const startServer = async () => {
       logger.info(`API available at http://localhost:${PORT}/api`);
     });
   } catch (error) {
+    console.error("Failed to start server:", error);
     logger.error("Failed to start server:", error);
     process.exit(1);
   }
