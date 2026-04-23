@@ -141,23 +141,20 @@ const EXCHANGE_RATES: Record<
   string,
   { symbol: string; rate: number; label: string }
 > = {
-  INR: { symbol: "₹",  rate: 1,        label: "INR – Indian Rupee" },
-  USD: { symbol: "$",  rate: 0.012,    label: "USD – US Dollar" },
-  EUR: { symbol: "€",  rate: 0.011,    label: "EUR – Euro" },
-  JPY: { symbol: "¥",  rate: 1.80,     label: "JPY – Japanese Yen" },
-  GBP: { symbol: "£",  rate: 0.0095,   label: "GBP – British Pound" },
-  AED: { symbol: "د.إ", rate: 0.044,   label: "AED – UAE Dirham" },
-  CNY: { symbol: "¥",  rate: 0.087,    label: "CNY – Chinese Yuan" },
-  SGD: { symbol: "S$", rate: 0.016,    label: "SGD – Singapore Dollar" },
-  CAD: { symbol: "C$", rate: 0.016,    label: "CAD – Canadian Dollar" },
-  AUD: { symbol: "A$", rate: 0.019,    label: "AUD – Australian Dollar" },
+  INR: { symbol: "₹", rate: 1, label: "INR – Indian Rupee" },
+  USD: { symbol: "$", rate: 0.012, label: "USD – US Dollar" },
+  EUR: { symbol: "€", rate: 0.011, label: "EUR – Euro" },
+  JPY: { symbol: "¥", rate: 1.8, label: "JPY – Japanese Yen" },
+  GBP: { symbol: "£", rate: 0.0095, label: "GBP – British Pound" },
+  AED: { symbol: "د.إ", rate: 0.044, label: "AED – UAE Dirham" },
+  CNY: { symbol: "¥", rate: 0.087, label: "CNY – Chinese Yuan" },
+  SGD: { symbol: "S$", rate: 0.016, label: "SGD – Singapore Dollar" },
+  CAD: { symbol: "C$", rate: 0.016, label: "CAD – Canadian Dollar" },
+  AUD: { symbol: "A$", rate: 0.019, label: "AUD – Australian Dollar" },
 };
 
 /** Convert a stored INR string to the selected currency for display. */
-function convertPrice(
-  raw: string | null,
-  currency: string,
-): string | null {
+function convertPrice(raw: string | null, currency: string): string | null {
   if (!raw) return null;
   // Extract the first number-like sequence from the string
   const match = raw.match(/[\d.,]+/);
@@ -178,6 +175,8 @@ interface PriceCellProps {
   value: string | null;
   rowId: string;
   currency: string;
+  defaultCurrency: string;
+  onCurrencyChange: (rowId: string, currency: string) => void;
   onSave: (rowId: string, field: string, value: string | null) => void;
 }
 
@@ -186,6 +185,8 @@ const PriceCell = React.memo(function PriceCell({
   value,
   rowId,
   currency,
+  defaultCurrency,
+  onCurrencyChange,
   onSave,
 }: PriceCellProps) {
   const [isEditing, setIsEditing] = useState(false);
@@ -231,14 +232,29 @@ const PriceCell = React.memo(function PriceCell({
       : convertPrice(value, currency);
 
   return (
-    <div
-      onClick={() => setIsEditing(true)}
-      title={currency !== "INR" && value ? `INR: ₹${value}` : "Click to edit"}
-      className="text-sm cursor-pointer hover:bg-blue-50 p-1 rounded min-h-[24px]"
-    >
-      {display || (
-        <span className="text-gray-400 italic text-xs">Click to edit</span>
-      )}
+    <div className="space-y-1">
+      <div
+        onClick={() => setIsEditing(true)}
+        title={currency !== "INR" && value ? `INR: ₹${value}` : "Click to edit"}
+        className="text-sm cursor-pointer hover:bg-blue-50 p-1 rounded min-h-[24px]"
+      >
+        {display || (
+          <span className="text-gray-400 italic text-xs">Click to edit</span>
+        )}
+      </div>
+      <select
+        value={currency}
+        onClick={(e) => e.stopPropagation()}
+        onChange={(e) => onCurrencyChange(rowId, e.target.value)}
+        className="text-xs border border-gray-300 rounded px-1.5 py-1 bg-white text-gray-700 w-full"
+        title="Currency for this row"
+      >
+        {Object.entries(EXCHANGE_RATES).map(([code, { label }]) => (
+          <option key={code} value={code}>
+            {code === defaultCurrency ? `${label} (default)` : label}
+          </option>
+        ))}
+      </select>
     </div>
   );
 });
@@ -276,6 +292,9 @@ function MaterialsTable({
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [selectedCurrency, setSelectedCurrency] = useState<string>("INR");
+  const [rowCurrencies, setRowCurrencies] = useState<Record<string, string>>(
+    {},
+  );
 
   const toggleExpanded = (id: string) =>
     setExpandedIds((prev) => {
@@ -325,6 +344,18 @@ function MaterialsTable({
       onUpdate(rowId, { [field]: value });
     },
     [onUpdate],
+  );
+
+  const handleRowCurrencyChange = useCallback(
+    (rowId: string, currency: string) => {
+      setRowCurrencies((prev) => ({ ...prev, [rowId]: currency }));
+    },
+    [],
+  );
+
+  const getRowCurrency = useCallback(
+    (rowId: string) => rowCurrencies[rowId] ?? selectedCurrency,
+    [rowCurrencies, selectedCurrency],
   );
 
   const pageOffset = (pagination.page - 1) * pagination.limit;
@@ -399,7 +430,7 @@ function MaterialsTable({
           <div className="flex items-center gap-1">
             <span>Price</span>
             <span className="text-gray-400 font-normal normal-case">
-              ({EXCHANGE_RATES[selectedCurrency]?.symbol ?? "₹"})
+              (per row)
             </span>
           </div>
         ),
@@ -408,7 +439,9 @@ function MaterialsTable({
           <PriceCell
             value={row.original.price}
             rowId={row.original.id}
-            currency={selectedCurrency}
+            currency={getRowCurrency(row.original.id)}
+            defaultCurrency={selectedCurrency}
+            onCurrencyChange={handleRowCurrencyChange}
             onSave={handleCellSave}
           />
         ),
@@ -568,6 +601,8 @@ function MaterialsTable({
       expandedIds,
       toggleExpanded,
       selectedCurrency,
+      getRowCurrency,
+      handleRowCurrencyChange,
     ],
   );
 
@@ -614,7 +649,7 @@ function MaterialsTable({
           {/* Currency selector */}
           <div className="flex items-center gap-1.5">
             <span className="text-xs text-gray-500 whitespace-nowrap">
-              Currency:
+              Default Currency:
             </span>
             <select
               value={selectedCurrency}
@@ -778,7 +813,9 @@ function MaterialsTable({
                       <PriceCell
                         value={sub.price}
                         rowId={sub.id}
-                        currency={selectedCurrency}
+                        currency={getRowCurrency(sub.id)}
+                        defaultCurrency={selectedCurrency}
+                        onCurrencyChange={handleRowCurrencyChange}
                         onSave={handleCellSave}
                       />
                     </td>
