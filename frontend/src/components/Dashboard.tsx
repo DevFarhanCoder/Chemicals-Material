@@ -5,6 +5,7 @@ import {
   MaterialFilters,
   DashboardStats,
   MaterialUpdate,
+  CurrencyCode,
 } from "../types";
 import MaterialsTable from "./MaterialsTable";
 import FilterBar from "./FilterBar";
@@ -12,6 +13,19 @@ import StatsPanel from "./StatsPanel";
 import Notification from "./Notification";
 
 function Dashboard() {
+  const CURRENCY_OPTIONS: CurrencyCode[] = [
+    "INR",
+    "USD",
+    "EUR",
+    "JPY",
+    "GBP",
+    "AED",
+    "CNY",
+    "SGD",
+    "CAD",
+    "AUD",
+  ];
+
   const [materials, setMaterials] = useState<Material[]>([]);
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [filters, setFilters] = useState<MaterialFilters>({
@@ -31,6 +45,21 @@ function Dashboard() {
     message: string;
     type: "success" | "error" | "info";
   } | null>(null);
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [isPublishing, setIsPublishing] = useState(false);
+  const [newMaterialForm, setNewMaterialForm] = useState({
+    caseNo: `MANUAL-${Date.now()}`,
+    productName: "",
+    companyName: "",
+    price: "",
+    priceCurrency: "INR" as CurrencyCode,
+    unit: "",
+    email: "",
+    mobile: "",
+    location: "",
+    remarks: "",
+    lastContacted: "",
+  });
   const notifTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Fetch materials
@@ -201,26 +230,66 @@ function Dashboard() {
     [showNotification],
   );
 
-  // Handle material add
-  const handleMaterialAdd = async () => {
+  // Open add-material form
+  const handleMaterialAdd = () => {
+    setNewMaterialForm({
+      caseNo: `MANUAL-${Date.now()}`,
+      productName: "",
+      companyName: "",
+      price: "",
+      priceCurrency: "INR",
+      unit: "",
+      email: "",
+      mobile: "",
+      location: "",
+      remarks: "",
+      lastContacted: "",
+    });
+    setShowAddForm(true);
+  };
+
+  // Publish material from form
+  const handlePublishMaterial = async () => {
+    if (!newMaterialForm.caseNo.trim()) {
+      showNotification("CAS No. is required", "error");
+      return;
+    }
+    if (!newMaterialForm.productName.trim()) {
+      showNotification("Product Name is required", "error");
+      return;
+    }
+    if (!newMaterialForm.companyName.trim()) {
+      showNotification("Company Name is required", "error");
+      return;
+    }
+
     try {
-      // Create a new material with default values (unique caseNo using timestamp)
+      setIsPublishing(true);
       await api.createMaterial({
-        caseNo: `MANUAL-${Date.now()}`,
-        productName: "New Product",
-        companyName: "New Company",
+        caseNo: newMaterialForm.caseNo.trim(),
+        productName: newMaterialForm.productName.trim(),
+        companyName: newMaterialForm.companyName.trim(),
         sourceUrl: "manual-entry",
         sourceSite: "MANUAL",
-        priceCurrency: "INR",
+        price: newMaterialForm.price.trim() || null,
+        priceCurrency: newMaterialForm.priceCurrency,
+        unit: newMaterialForm.unit.trim() || null,
+        email: newMaterialForm.email.trim() || null,
+        mobile: newMaterialForm.mobile.trim() || null,
+        location: newMaterialForm.location.trim() || null,
+        remarks: newMaterialForm.remarks.trim() || null,
+        lastContacted: newMaterialForm.lastContacted
+          ? `${newMaterialForm.lastContacted}T00:00:00.000Z`
+          : null,
       });
-      showNotification(
-        "Material added successfully. Click fields to edit.",
-        "success",
-      );
+      showNotification("Material published successfully", "success");
+      setShowAddForm(false);
       fetchMaterials();
       fetchStats();
     } catch (error) {
-      showNotification("Failed to add material", "error");
+      showNotification("Failed to publish material", "error");
+    } finally {
+      setIsPublishing(false);
     }
   };
 
@@ -276,6 +345,221 @@ function Dashboard() {
           type={notification.type}
           onClose={() => setNotification(null)}
         />
+      )}
+
+      {/* Add Material Form Modal */}
+      {showAddForm && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-3xl max-h-[90vh] overflow-y-auto">
+            <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-gray-900">
+                Add New Material
+              </h3>
+              <button
+                onClick={() => setShowAddForm(false)}
+                className="text-gray-400 hover:text-gray-600 text-xl leading-none"
+                aria-label="Close form"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="px-6 py-5 grid grid-cols-1 md:grid-cols-2 gap-4">
+              <label className="block">
+                <span className="text-sm font-medium text-gray-700">
+                  CAS No. *
+                </span>
+                <input
+                  value={newMaterialForm.caseNo}
+                  onChange={(e) =>
+                    setNewMaterialForm((prev) => ({
+                      ...prev,
+                      caseNo: e.target.value,
+                    }))
+                  }
+                  className="mt-1 w-full border border-gray-300 rounded px-3 py-2 text-sm"
+                />
+              </label>
+
+              <label className="block">
+                <span className="text-sm font-medium text-gray-700">
+                  Product Name *
+                </span>
+                <input
+                  value={newMaterialForm.productName}
+                  onChange={(e) =>
+                    setNewMaterialForm((prev) => ({
+                      ...prev,
+                      productName: e.target.value,
+                    }))
+                  }
+                  className="mt-1 w-full border border-gray-300 rounded px-3 py-2 text-sm"
+                />
+              </label>
+
+              <label className="block">
+                <span className="text-sm font-medium text-gray-700">
+                  Company Name *
+                </span>
+                <input
+                  value={newMaterialForm.companyName}
+                  onChange={(e) =>
+                    setNewMaterialForm((prev) => ({
+                      ...prev,
+                      companyName: e.target.value,
+                    }))
+                  }
+                  className="mt-1 w-full border border-gray-300 rounded px-3 py-2 text-sm"
+                />
+              </label>
+
+              <label className="block">
+                <span className="text-sm font-medium text-gray-700">
+                  Upload Currency
+                </span>
+                <select
+                  value={newMaterialForm.priceCurrency}
+                  onChange={(e) =>
+                    setNewMaterialForm((prev) => ({
+                      ...prev,
+                      priceCurrency: e.target.value as CurrencyCode,
+                    }))
+                  }
+                  className="mt-1 w-full border border-gray-300 rounded px-3 py-2 text-sm bg-white"
+                >
+                  {CURRENCY_OPTIONS.map((code) => (
+                    <option key={code} value={code}>
+                      {code}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="block">
+                <span className="text-sm font-medium text-gray-700">Price</span>
+                <input
+                  value={newMaterialForm.price}
+                  onChange={(e) =>
+                    setNewMaterialForm((prev) => ({
+                      ...prev,
+                      price: e.target.value,
+                    }))
+                  }
+                  placeholder={`Enter amount in ${newMaterialForm.priceCurrency}`}
+                  className="mt-1 w-full border border-gray-300 rounded px-3 py-2 text-sm"
+                />
+              </label>
+
+              <label className="block">
+                <span className="text-sm font-medium text-gray-700">Unit</span>
+                <input
+                  value={newMaterialForm.unit}
+                  onChange={(e) =>
+                    setNewMaterialForm((prev) => ({
+                      ...prev,
+                      unit: e.target.value,
+                    }))
+                  }
+                  className="mt-1 w-full border border-gray-300 rounded px-3 py-2 text-sm"
+                />
+              </label>
+
+              <label className="block">
+                <span className="text-sm font-medium text-gray-700">Email</span>
+                <input
+                  value={newMaterialForm.email}
+                  onChange={(e) =>
+                    setNewMaterialForm((prev) => ({
+                      ...prev,
+                      email: e.target.value,
+                    }))
+                  }
+                  className="mt-1 w-full border border-gray-300 rounded px-3 py-2 text-sm"
+                />
+              </label>
+
+              <label className="block">
+                <span className="text-sm font-medium text-gray-700">
+                  Contact No.
+                </span>
+                <input
+                  value={newMaterialForm.mobile}
+                  onChange={(e) =>
+                    setNewMaterialForm((prev) => ({
+                      ...prev,
+                      mobile: e.target.value,
+                    }))
+                  }
+                  className="mt-1 w-full border border-gray-300 rounded px-3 py-2 text-sm"
+                />
+              </label>
+
+              <label className="block">
+                <span className="text-sm font-medium text-gray-700">
+                  State Location
+                </span>
+                <input
+                  value={newMaterialForm.location}
+                  onChange={(e) =>
+                    setNewMaterialForm((prev) => ({
+                      ...prev,
+                      location: e.target.value,
+                    }))
+                  }
+                  className="mt-1 w-full border border-gray-300 rounded px-3 py-2 text-sm"
+                />
+              </label>
+
+              <label className="block md:col-span-2">
+                <span className="text-sm font-medium text-gray-700">Date</span>
+                <input
+                  type="date"
+                  value={newMaterialForm.lastContacted}
+                  onChange={(e) =>
+                    setNewMaterialForm((prev) => ({
+                      ...prev,
+                      lastContacted: e.target.value,
+                    }))
+                  }
+                  className="mt-1 w-full border border-gray-300 rounded px-3 py-2 text-sm"
+                />
+              </label>
+
+              <label className="block md:col-span-2">
+                <span className="text-sm font-medium text-gray-700">
+                  Remark
+                </span>
+                <textarea
+                  value={newMaterialForm.remarks}
+                  onChange={(e) =>
+                    setNewMaterialForm((prev) => ({
+                      ...prev,
+                      remarks: e.target.value,
+                    }))
+                  }
+                  rows={3}
+                  className="mt-1 w-full border border-gray-300 rounded px-3 py-2 text-sm"
+                />
+              </label>
+            </div>
+
+            <div className="px-6 py-4 border-t border-gray-200 flex justify-end gap-2">
+              <button
+                onClick={() => setShowAddForm(false)}
+                className="px-4 py-2 rounded border border-gray-300 text-gray-700 hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handlePublishMaterial}
+                disabled={isPublishing}
+                className="px-4 py-2 rounded bg-primary-600 text-white hover:bg-primary-700 disabled:opacity-60"
+              >
+                {isPublishing ? "Publishing..." : "Publish Row"}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
