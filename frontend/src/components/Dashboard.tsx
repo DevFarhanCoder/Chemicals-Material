@@ -166,6 +166,7 @@ function Dashboard() {
         companyName: parent?.companyName || "New Company",
         sourceUrl: "manual-entry",
         sourceSite: "MANUAL",
+        priceCurrency: "INR",
         parentId,
       });
       setMaterials((prev) =>
@@ -210,6 +211,7 @@ function Dashboard() {
         companyName: "New Company",
         sourceUrl: "manual-entry",
         sourceSite: "MANUAL",
+        priceCurrency: "INR",
       });
       showNotification(
         "Material added successfully. Click fields to edit.",

@@ -7,7 +7,7 @@ import {
   SortingState,
   ColumnDef,
 } from "@tanstack/react-table";
-import { Material, PaginationInfo } from "../types";
+import { Material, PaginationInfo, CurrencyCode } from "../types";
 import { format } from "date-fns";
 
 // =============================================================================
@@ -138,7 +138,7 @@ const EditableCell = React.memo(function EditableCell({
 // Currency conversion
 // =============================================================================
 const EXCHANGE_RATES: Record<
-  string,
+  CurrencyCode,
   { symbol: string; rate: number; label: string }
 > = {
   INR: { symbol: "₹", rate: 1, label: "INR – Indian Rupee" },
@@ -153,16 +153,25 @@ const EXCHANGE_RATES: Record<
   AUD: { symbol: "A$", rate: 0.019, label: "AUD – Australian Dollar" },
 };
 
-/** Convert a stored INR string to the selected currency for display. */
-function convertPrice(raw: string | null, currency: string): string | null {
+/** Convert stored price from base currency to viewer-selected currency. */
+function convertPrice(
+  raw: string | null,
+  fromCurrency: CurrencyCode,
+  toCurrency: CurrencyCode,
+): string | null {
   if (!raw) return null;
   // Extract the first number-like sequence from the string
   const match = raw.match(/[\d.,]+/);
   if (!match) return raw; // non-numeric string — return as-is
   const num = parseFloat(match[0].replace(/,/g, ""));
   if (isNaN(num)) return raw;
-  const { symbol, rate } = EXCHANGE_RATES[currency] || EXCHANGE_RATES.INR;
-  const converted = num * rate;
+  const fromRate =
+    EXCHANGE_RATES[fromCurrency]?.rate ?? EXCHANGE_RATES.INR.rate;
+  const toRate = EXCHANGE_RATES[toCurrency]?.rate ?? EXCHANGE_RATES.INR.rate;
+  const inrValue = num / fromRate;
+  const converted = inrValue * toRate;
+  const symbol =
+    EXCHANGE_RATES[toCurrency]?.symbol ?? EXCHANGE_RATES.INR.symbol;
   // Format: no decimals for large values, 2 decimals otherwise
   const formatted =
     converted >= 100
@@ -174,19 +183,17 @@ function convertPrice(raw: string | null, currency: string): string | null {
 interface PriceCellProps {
   value: string | null;
   rowId: string;
-  currency: string;
-  defaultCurrency: string;
-  onCurrencyChange: (rowId: string, currency: string) => void;
+  baseCurrency?: CurrencyCode;
+  viewerCurrency: CurrencyCode;
   onSave: (rowId: string, field: string, value: string | null) => void;
 }
 
-/** Price cell: edits raw INR value, displays in selected currency. */
+/** Price cell: edits raw value in row's base currency, displays in viewer currency. */
 const PriceCell = React.memo(function PriceCell({
   value,
   rowId,
-  currency,
-  defaultCurrency,
-  onCurrencyChange,
+  baseCurrency = "INR",
+  viewerCurrency,
   onSave,
 }: PriceCellProps) {
   const [isEditing, setIsEditing] = useState(false);
@@ -218,24 +225,23 @@ const PriceCell = React.memo(function PriceCell({
           if (e.key === "Enter") e.currentTarget.blur();
           if (e.key === "Escape") cancel();
         }}
-        placeholder="Enter in INR"
+        placeholder={`Enter in ${baseCurrency}`}
         className="text-sm border border-blue-400 rounded px-2 py-1 w-full outline-none focus:ring-2 focus:ring-blue-200"
       />
     );
   }
 
-  const display =
-    currency === "INR"
-      ? value
-        ? `₹${value}`
-        : null
-      : convertPrice(value, currency);
+  const display = convertPrice(value, baseCurrency, viewerCurrency);
 
   return (
     <div className="space-y-1">
       <div
         onClick={() => setIsEditing(true)}
-        title={currency !== "INR" && value ? `INR: ₹${value}` : "Click to edit"}
+        title={
+          value
+            ? `Stored as ${baseCurrency}: ${EXCHANGE_RATES[baseCurrency].symbol}${value}`
+            : "Click to edit"
+        }
         className="text-sm cursor-pointer hover:bg-blue-50 p-1 rounded min-h-[24px]"
       >
         {display || (
@@ -243,15 +249,17 @@ const PriceCell = React.memo(function PriceCell({
         )}
       </div>
       <select
-        value={currency}
+        value={baseCurrency}
         onClick={(e) => e.stopPropagation()}
-        onChange={(e) => onCurrencyChange(rowId, e.target.value)}
+        onChange={(e) =>
+          onSave(rowId, "priceCurrency", e.target.value as CurrencyCode)
+        }
         className="text-xs border border-gray-300 rounded px-1.5 py-1 bg-white text-gray-700 w-full"
-        title="Currency for this row"
+        title="Stored currency for this row"
       >
         {Object.entries(EXCHANGE_RATES).map(([code, { label }]) => (
           <option key={code} value={code}>
-            {code === defaultCurrency ? `${label} (default)` : label}
+            {label}
           </option>
         ))}
       </select>
@@ -291,10 +299,7 @@ function MaterialsTable({
   const [selectMode, setSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
-  const [selectedCurrency, setSelectedCurrency] = useState<string>("INR");
-  const [rowCurrencies, setRowCurrencies] = useState<Record<string, string>>(
-    {},
-  );
+  const [selectedCurrency, setSelectedCurrency] = useState<CurrencyCode>("INR");
 
   const toggleExpanded = (id: string) =>
     setExpandedIds((prev) => {
@@ -344,18 +349,6 @@ function MaterialsTable({
       onUpdate(rowId, { [field]: value });
     },
     [onUpdate],
-  );
-
-  const handleRowCurrencyChange = useCallback(
-    (rowId: string, currency: string) => {
-      setRowCurrencies((prev) => ({ ...prev, [rowId]: currency }));
-    },
-    [],
-  );
-
-  const getRowCurrency = useCallback(
-    (rowId: string) => rowCurrencies[rowId] ?? selectedCurrency,
-    [rowCurrencies, selectedCurrency],
   );
 
   const pageOffset = (pagination.page - 1) * pagination.limit;
@@ -430,7 +423,7 @@ function MaterialsTable({
           <div className="flex items-center gap-1">
             <span>Price</span>
             <span className="text-gray-400 font-normal normal-case">
-              (per row)
+              ({EXCHANGE_RATES[selectedCurrency].symbol})
             </span>
           </div>
         ),
@@ -439,9 +432,8 @@ function MaterialsTable({
           <PriceCell
             value={row.original.price}
             rowId={row.original.id}
-            currency={getRowCurrency(row.original.id)}
-            defaultCurrency={selectedCurrency}
-            onCurrencyChange={handleRowCurrencyChange}
+            baseCurrency={row.original.priceCurrency ?? "INR"}
+            viewerCurrency={selectedCurrency}
             onSave={handleCellSave}
           />
         ),
@@ -601,8 +593,6 @@ function MaterialsTable({
       expandedIds,
       toggleExpanded,
       selectedCurrency,
-      getRowCurrency,
-      handleRowCurrencyChange,
     ],
   );
 
@@ -649,11 +639,13 @@ function MaterialsTable({
           {/* Currency selector */}
           <div className="flex items-center gap-1.5">
             <span className="text-xs text-gray-500 whitespace-nowrap">
-              Default Currency:
+              Viewer Currency:
             </span>
             <select
               value={selectedCurrency}
-              onChange={(e) => setSelectedCurrency(e.target.value)}
+              onChange={(e) =>
+                setSelectedCurrency(e.target.value as CurrencyCode)
+              }
               className="text-xs border border-gray-300 rounded px-2 py-1.5 bg-white text-gray-700 font-medium cursor-pointer hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-300"
             >
               {Object.entries(EXCHANGE_RATES).map(([code, { label }]) => (
@@ -813,9 +805,8 @@ function MaterialsTable({
                       <PriceCell
                         value={sub.price}
                         rowId={sub.id}
-                        currency={getRowCurrency(sub.id)}
-                        defaultCurrency={selectedCurrency}
-                        onCurrencyChange={handleRowCurrencyChange}
+                        baseCurrency={sub.priceCurrency ?? "INR"}
+                        viewerCurrency={selectedCurrency}
                         onSave={handleCellSave}
                       />
                     </td>

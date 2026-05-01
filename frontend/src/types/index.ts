@@ -5,6 +5,18 @@ export type MaterialStatus =
   | "NOT_INTERESTED"
   | "CONVERTED";
 
+export type CurrencyCode =
+  | "INR"
+  | "USD"
+  | "EUR"
+  | "JPY"
+  | "GBP"
+  | "AED"
+  | "CNY"
+  | "SGD"
+  | "CAD"
+  | "AUD";
+
 export interface Material {
   id: string;
   caseNo: string;
@@ -14,6 +26,7 @@ export interface Material {
   companyName: string;
   location: string | null;
   price: string | null;
+  priceCurrency?: CurrencyCode;
   unit: string | null;
   status: MaterialStatus;
   remarks: string | null;
@@ -35,6 +48,7 @@ export interface MaterialUpdate {
   companyName?: string;
   location?: string | null;
   price?: string | null;
+  priceCurrency?: CurrencyCode;
   unit?: string | null;
   status?: MaterialStatus;
   remarks?: string | null;

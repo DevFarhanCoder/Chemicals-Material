@@ -9,6 +9,17 @@ export interface IMaterial {
   companyName: string;
   location: string | null;
   price: string | null;
+  priceCurrency:
+    | "INR"
+    | "USD"
+    | "EUR"
+    | "JPY"
+    | "GBP"
+    | "AED"
+    | "CNY"
+    | "SGD"
+    | "CAD"
+    | "AUD";
   unit: string | null;
   status: "PENDING" | "CONTACTED" | "NOT_INTERESTED" | "CONVERTED";
   remarks: string | null;
@@ -31,6 +42,22 @@ const MaterialSchema = new Schema<IMaterial>(
     companyName: { type: String, required: true, maxlength: 255 },
     location: { type: String, default: null, maxlength: 255 },
     price: { type: String, default: null, maxlength: 100 },
+    priceCurrency: {
+      type: String,
+      enum: [
+        "INR",
+        "USD",
+        "EUR",
+        "JPY",
+        "GBP",
+        "AED",
+        "CNY",
+        "SGD",
+        "CAD",
+        "AUD",
+      ],
+      default: "INR",
+    },
     unit: { type: String, default: null, maxlength: 50 },
     status: {
       type: String,

@@ -8,6 +8,20 @@ export const MaterialSchema = z.object({
   companyName: z.string().min(1).max(255),
   location: z.string().max(255).optional().nullable(),
   price: z.string().max(100).optional().nullable(),
+  priceCurrency: z
+    .enum([
+      "INR",
+      "USD",
+      "EUR",
+      "JPY",
+      "GBP",
+      "AED",
+      "CNY",
+      "SGD",
+      "CAD",
+      "AUD",
+    ])
+    .optional(),
   unit: z.string().max(50).optional().nullable(),
   status: z
     .enum(["PENDING", "CONTACTED", "NOT_INTERESTED", "CONVERTED"])
@@ -32,6 +46,20 @@ export const CreateMaterialSchema = z.object({
   mobile: z.string().max(50).optional().nullable(),
   location: z.string().max(255).optional().nullable(),
   price: z.string().max(100).optional().nullable(),
+  priceCurrency: z
+    .enum([
+      "INR",
+      "USD",
+      "EUR",
+      "JPY",
+      "GBP",
+      "AED",
+      "CNY",
+      "SGD",
+      "CAD",
+      "AUD",
+    ])
+    .optional(),
   unit: z.string().max(50).optional().nullable(),
   status: z
     .enum(["PENDING", "CONTACTED", "NOT_INTERESTED", "CONVERTED"])
