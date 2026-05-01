@@ -184,7 +184,7 @@ interface PriceCellProps {
   value: string | null;
   rowId: string;
   baseCurrency?: CurrencyCode;
-  viewerCurrency: CurrencyCode;
+  viewerCurrency: CurrencyCode | "BASE";
   onSave: (rowId: string, field: string, value: string | null) => void;
 }
 
@@ -231,7 +231,12 @@ const PriceCell = React.memo(function PriceCell({
     );
   }
 
-  const display = convertPrice(value, baseCurrency, viewerCurrency);
+  const display =
+    viewerCurrency === "BASE"
+      ? value
+        ? `${EXCHANGE_RATES[baseCurrency].symbol}${value}`
+        : null
+      : convertPrice(value, baseCurrency, viewerCurrency);
 
   return (
     <div className="space-y-1">
@@ -299,7 +304,9 @@ function MaterialsTable({
   const [selectMode, setSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
-  const [selectedCurrency, setSelectedCurrency] = useState<CurrencyCode>("INR");
+  const [selectedCurrency, setSelectedCurrency] = useState<
+    CurrencyCode | "BASE"
+  >("BASE");
 
   const toggleExpanded = (id: string) =>
     setExpandedIds((prev) => {
@@ -423,7 +430,9 @@ function MaterialsTable({
           <div className="flex items-center gap-1">
             <span>Price</span>
             <span className="text-gray-400 font-normal normal-case">
-              ({EXCHANGE_RATES[selectedCurrency].symbol})
+              {selectedCurrency === "BASE"
+                ? "(Uploaded)"
+                : `(${EXCHANGE_RATES[selectedCurrency].symbol})`}
             </span>
           </div>
         ),
@@ -644,10 +653,11 @@ function MaterialsTable({
             <select
               value={selectedCurrency}
               onChange={(e) =>
-                setSelectedCurrency(e.target.value as CurrencyCode)
+                setSelectedCurrency(e.target.value as CurrencyCode | "BASE")
               }
               className="text-xs border border-gray-300 rounded px-2 py-1.5 bg-white text-gray-700 font-medium cursor-pointer hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-300"
             >
+              <option value="BASE">Uploaded Currency (As Published)</option>
               {Object.entries(EXCHANGE_RATES).map(([code, { label }]) => (
                 <option key={code} value={code}>
                   {label}

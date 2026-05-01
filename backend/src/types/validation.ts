@@ -65,6 +65,7 @@ export const CreateMaterialSchema = z.object({
     .enum(["PENDING", "CONTACTED", "NOT_INTERESTED", "CONVERTED"])
     .optional(),
   remarks: z.string().optional().nullable(),
+  lastContacted: z.string().datetime().optional().nullable(),
   parentId: z.string().uuid().optional().nullable(),
 });
 

@@ -24,7 +24,10 @@ export const listMaterials = async (
     const query: any = { parentId: null };
 
     if (filters.search) {
-      const re = new RegExp(filters.search.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
+      const re = new RegExp(
+        filters.search.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
+        "i",
+      );
       query.$or = [
         { productName: re },
         { caseNo: re },
@@ -38,11 +41,17 @@ export const listMaterials = async (
     }
 
     if (filters.company) {
-      query.companyName = new RegExp(filters.company.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
+      query.companyName = new RegExp(
+        filters.company.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
+        "i",
+      );
     }
 
     if (filters.location) {
-      query.location = new RegExp(filters.location.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
+      query.location = new RegExp(
+        filters.location.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
+        "i",
+      );
     }
 
     if (filters.status) {
@@ -129,11 +138,20 @@ export const createMaterial = async (
   try {
     const createData = CreateMaterialSchema.parse(req.body);
 
-    const newMaterial = await Material.create({
-      _id: randomUUID(),
+    const createPayload: any = {
       ...createData,
       status: createData.status || "PENDING",
       scrapedAt: new Date(),
+    };
+    if (createData.lastContacted !== undefined) {
+      createPayload.lastContacted = createData.lastContacted
+        ? new Date(createData.lastContacted)
+        : null;
+    }
+
+    const newMaterial = await Material.create({
+      _id: randomUUID(),
+      ...createPayload,
     });
 
     logger.info(`Material ${newMaterial._id} created manually`);
